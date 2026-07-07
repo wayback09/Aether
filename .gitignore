@@ -1,0 +1,30 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+build/bin/
+
+# Wails bindings
+frontend/wailsjs/
+wailsbindings.exe
+
+# Node/Svelte
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.npm/
+
+# Go
+vendor/
+go.work
+
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Aether Local Dev Data
+.aether/
