@@ -27,8 +27,19 @@ The security architecture uses a capability-based model. Instead of giving an ex
 - Malicious extensions attempting to steal Minecraft session tokens.
 - Extensions attempting to download and execute arbitrary binaries (malware).
 - Extensions attempting to read arbitrary files on the user's system (e.g., SSH keys, browser cookies).
+- Extensions attempting to execute arbitrary shell commands.
+- Extensions attempting to escape the Goja Sandbox.
 
 **Mitigation:**
+Every privileged operation is strictly mediated by the launcher. Extensions explicitly **CANNOT**:
+- Execute arbitrary shell commands (e.g., via `os/exec`).
+- Access the filesystem directly (they can only use scoped `Aether.fs` APIs).
+- Read launcher memory.
+- Access Microsoft authentication tokens.
+- Access another extension's data.
+- Escape the Goja sandbox (which has zero bindings by default).
+- Access Go APIs directly.
+
 - Token access is strictly forbidden for extensions. Authentication is handled entirely by the core Go backend.
-- File system access is abstracted. Extensions cannot read or write outside their designated isolated storage directory unless explicitly granted highly scrutinized permissions (like `fs:export`).
+- File system access is abstracted. Extensions cannot read or write outside their designated isolated storage directory unless explicitly granted highly scrutinized permissions.
 - Network access is strictly allow-listed.

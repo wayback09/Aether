@@ -84,8 +84,21 @@ Instance Details Tabs:
 - Play
 - Settings
 - Extensions
-Nothing else.
-Mods, Logs, Servers, Worlds are added only by extensions.
+## Extension UI Rules
+
+Extensions MAY:
+- Register sidebar pages (rendered in an iframe)
+- Register dialogs (planned)
+- Register notifications (planned)
+
+Extensions MAY NOT:
+- Modify launcher chrome (sidebar, window controls, titlebar)
+- Replace navigation
+- Inject arbitrary HTML outside their iframe
+- Overlay the entire application
+- Modify other extensions
+
+By enforcing these constraints, Aether guarantees a stable, predictable user experience regardless of how many extensions are installed.
 
 ## Extensions
 Purpose: Manage installed extensions.

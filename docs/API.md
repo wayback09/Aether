@@ -1,38 +1,94 @@
-# API & Interoperability
+# Extension API & Sandbox
 
-## JSON-RPC Endpoints
-The launcher exposes a local JSON-RPC 2.0 API over a named pipe or Unix domain socket for extensions to communicate with the core launcher.
+Aether executes extension backend scripts inside an isolated **Goja JavaScript runtime**. 
 
-### Core Endpoints
-- `launcher.getVersion`: Returns the current launcher version.
-- `launcher.getInstances`: Returns a list of all installed Minecraft instances.
-- `launcher.launchInstance(id)`: Initiates the launch sequence for a specific instance.
-- `launcher.killInstance(id)`: Forcefully terminates a running instance.
+> [!WARNING]
+> This backend environment is **NOT** a browser or a Node.js environment. The following APIs are unavailable:
+> - `window`
+> - `document`
+> - `fetch` (unless explicitly provided via `Aether.network.fetch`)
+> - `localStorage`
+> - `require()`
+> - `process`, `fs`, `child_process` (and all other Node.js modules)
 
-### UI Endpoints
-- `ui.registerSidebarPage(id, title, icon, url)`: Registers a new page in the sidebar.
-- `ui.showNotification(title, message, type)`: Displays a notification (info, warning, error).
-- `ui.openDialog(options)`: Opens a modal dialog and returns the user's action.
+Instead, your script interacts with the launcher core via the injected `Aether` global object.
 
-## Permissions
-Extensions run in an isolated environment and must request permissions in their `manifest.json`.
+## The `Aether` Global Object
 
-- `instances:read`: View installed instances and their metadata.
-- `instances:write`: Create, modify, or delete instances.
-- `process:launch`: Start the Minecraft process.
-- `network:http`: Make external HTTP requests (requires whitelisted domains).
-- `fs:read`: Read from specific launcher directories.
-- `fs:write`: Write to extension-specific storage.
+When your extension's `main.js` is executed, the `Aether` object is injected into the global scope. The capabilities attached to this object depend strictly on the permissions requested in your `manifest.json`.
 
-## Versioning
-The API follows Semantic Versioning (SemVer). 
-- **Major version bumps** indicate breaking changes.
-- **Minor version bumps** indicate new features.
-- Extensions must declare their compatible API version range in `manifest.json`.
+### UI Registration (`ui:sidebar`)
+Allows the extension to register a frontend UI tab.
 
-## Extension Lifecycle
-1. **Installed**: The extension is downloaded and extracted.
-2. **Initialized**: The launcher reads the `manifest.json` and registers the extension.
-3. **Activated**: The `main` script of the extension is executed in the sandbox. This happens either on startup or when the extension's UI is accessed (lazy loading).
-4. **Suspended**: If the extension is inactive and consuming resources, it may be suspended.
-5. **Terminated**: The extension is stopped, and its resources are freed (e.g., when uninstalled or the launcher closes).
+- `Aether.ui.registerSidebarPage(options)`
+  - **options** (Object):
+    - `id` (String): A unique identifier for the tab.
+    - `label` (String): The text displayed on the tab.
+    - `url` (String): The path to your UI HTML file, relative to your extension's root directory (e.g., `"ui/index.html"`).
+
+### Dialogs (`dialogs:open`)
+*(Coming Soon)*
+- `Aether.ui.openDialog(options)`
+
+### Instance Management (`instances:patch`)
+Allows the extension to programmatically modify instance JSON files. This is primarily used for installer extensions (like Fabric or Forge).
+
+- `Aether.instances.patch(instanceId, patchData)`
+  - **instanceId** (String): The ID of the instance to patch.
+  - **patchData** (Object): The JSON data to merge or inject into the instance's version manifest.
+
+## Network Access
+By default, the backend Sandbox cannot access the network. To make HTTP requests, you must request `network:fetch` in your permissions and use the provided `Aether.network.fetch()` API (planned).
+Direct browser `fetch()` is intentionally omitted from the backend sandbox to ensure all requests pass through Aether's domain whitelisting, logging, and rate-limiting systems.
+
+*Note: Your frontend UI (running in the iframe) CAN use the browser's native `fetch()` because it operates under standard web security models, but this may be restricted in the future for security reasons.*
+
+## Communication with the Frontend (Iframe)
+Your frontend UI runs in an `<iframe>` served by a local HTTP server. Because it's isolated, it cannot call the `Aether` Go API directly.
+
+If your UI needs to trigger a backend sandbox action (e.g., downloading a mod directly to the instance folder), you will use the upcoming IPC bridge (planned for a future update), which will allow `postMessage` communication between the Iframe and the Goja Sandbox.
+
+## Lifecycle
+
+```mermaid
+graph TD
+    A[Launcher Starts] --> B[Read manifest.json]
+    B --> C[Validate manifest]
+    C --> D[Create Goja runtime]
+    D --> E[Inject Aether API]
+    E --> F[Execute main.js]
+    F --> G[Register UI]
+    G --> H[Ready]
+```
+
+### Lifecycle Callbacks (Planned)
+Future API versions will introduce explicit lifecycle callbacks so your extension can run setup or cleanup logic predictively:
+- `onLoad()`
+- `onEnable()`
+- `onDisable()`
+- `onUnload()`
+- `onUpdate()`
+
+## Events (Planned)
+Future API versions will allow extensions to subscribe to core launcher events:
+- `Aether.events.on('instance:launch', (id) => { ... })`
+- `Aether.events.on('instance:stop', (id) => { ... })`
+
+## API Version Negotiation
+Extensions must declare the `api` version they target in their `manifest.json`. Aether will inject the appropriate capability shapes based on this version to ensure backwards compatibility. You can optionally define `minApi` and `maxApi` to restrict which versions of the launcher can load your extension.
+
+## Extended Permissions Model
+
+Current permissions:
+- `ui:sidebar`
+- `instances:patch`
+
+Future granular permissions:
+- `instances:read`, `instances:write`
+- `settings:read`, `settings:write`
+- `launcher:launch`, `launcher:stop`
+- `downloads:start`, `downloads:cancel`
+- `notifications:show`
+- `dialogs:open`
+- `clipboard:read`, `clipboard:write`
+- `extensions:list`

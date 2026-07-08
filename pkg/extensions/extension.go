@@ -14,7 +14,7 @@ type Extension struct {
 	CPU     string `json:"cpu"`
 }
 
-// GetExtensions returns the list of loaded extensions from the GlobalManager
+// GetExtensions returns all installed extensions
 func GetExtensions() []Extension {
 	if GlobalManager != nil {
 		return GlobalManager.GetExtensions()

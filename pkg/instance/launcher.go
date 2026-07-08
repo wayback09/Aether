@@ -3,17 +3,112 @@ package instance
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"Aether/pkg/auth"
+	"Aether/pkg/fs"
+	"Aether/pkg/java"
+	"Aether/pkg/mojang"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// Launch spawns the Minecraft process (using a mock Java command for now)
+// Launch spawns the Minecraft process with the correct arguments
 func Launch(ctx context.Context, inst *Instance) error {
-	// Construct the massive Java command line (Mocked placeholder)
-	// We run "java -version" to prove subprocess execution and logging works.
-	cmd := exec.Command("java", "-version")
+	instanceDir := filepath.Join(fs.GetDataDir(), "instances", inst.ID)
+	assetsDir := fs.GetAssetsDir()
+
+	// 1. Find Java
+	javaPath, err := java.FindJava()
+	if err != nil {
+		return fmt.Errorf("java not found: %w", err)
+	}
+	fmt.Printf("[Launcher] Using Java: %s\n", javaPath)
+
+	// 2. Load saved version.json
+	versionPath := filepath.Join(instanceDir, "version.json")
+	versionData, err := os.ReadFile(versionPath)
+	if err != nil {
+		return fmt.Errorf("version.json not found — is the instance installed? %w", err)
+	}
+
+	var versionInfo mojang.VersionInfo
+	if err := json.Unmarshal(versionData, &versionInfo); err != nil {
+		return fmt.Errorf("failed to parse version.json: %w", err)
+	}
+
+	// 3. Build classpath
+	classpath := buildClasspath(instanceDir, &versionInfo)
+
+	// 4. Build native directory path
+	nativesDir := filepath.Join(instanceDir, "natives")
+
+	// 5. Build argument variable replacements
+	activeAccount := auth.GetActiveAccount()
+	username := "Player"
+	uuid := auth.GenerateOfflineUUID(username)
+	
+	if activeAccount != nil {
+		username = activeAccount.Username
+		uuid = activeAccount.ID
+	}
+
+	vars := map[string]string{
+		"${auth_player_name}":  username,
+		"${version_name}":     versionInfo.ID,
+		"${game_directory}":   instanceDir,
+		"${assets_root}":      assetsDir,
+		"${assets_index_name}": versionInfo.Assets,
+		"${auth_uuid}":        uuid,
+		"${auth_access_token}": "0",
+		"${clientid}":         "0",
+		"${auth_xuid}":        "0",
+		"${user_type}":        "legacy",
+		"${version_type}":     versionInfo.Type,
+		"${natives_directory}": nativesDir,
+		"${launcher_name}":    "Aether",
+		"${launcher_version}": "1.0",
+		"${classpath}":        classpath,
+		"${path}":             filepath.Join(instanceDir, versionInfo.Logging.Client.File.ID),
+	}
+
+	// 6. Resolve JVM arguments from version JSON
+	jvmArgs := mojang.ResolveArguments(versionInfo.Arguments.JVM)
+	jvmArgs = substituteVars(jvmArgs, vars)
+
+	// Add memory flags
+	memory := inst.Memory
+	if memory == "" {
+		memory = "4G"
+	}
+	jvmArgs = append([]string{"-Xmx" + memory, "-Xms512M"}, jvmArgs...)
+
+	// Add log4j config if available
+	if versionInfo.Logging.Client.File.URL != "" {
+		logConfigPath := filepath.Join(instanceDir, versionInfo.Logging.Client.File.ID)
+		if _, err := os.Stat(logConfigPath); err == nil {
+			logArg := strings.Replace(versionInfo.Logging.Client.Argument, "${path}", logConfigPath, 1)
+			jvmArgs = append(jvmArgs, logArg)
+		}
+	}
+
+	// 7. Resolve game arguments from version JSON
+	gameArgs := mojang.ResolveArguments(versionInfo.Arguments.Game)
+	gameArgs = substituteVars(gameArgs, vars)
+
+	// 8. Construct full command: java [jvm args] mainClass [game args]
+	args := append(jvmArgs, versionInfo.MainClass)
+	args = append(args, gameArgs...)
+
+	fmt.Printf("[Launcher] Command: %s %s\n", javaPath, strings.Join(args, " "))
+
+	cmd := exec.Command(javaPath, args...)
+	cmd.Dir = instanceDir
 
 	// Get pipes for stdout and stderr
 	stdout, err := cmd.StdoutPipe()
@@ -26,7 +121,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 	}
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start process: %w", err)
+		return fmt.Errorf("failed to start Minecraft: %w", err)
 	}
 
 	// Notify frontend that we are running
@@ -40,7 +135,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
 			runtime.EventsEmit(ctx, "instance:log", scanner.Text())
-			fmt.Println("[Launcher Log]", scanner.Text())
+			fmt.Println("[MC]", scanner.Text())
 		}
 	}()
 
@@ -48,7 +143,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			runtime.EventsEmit(ctx, "instance:log", scanner.Text())
-			fmt.Println("[Launcher Log]", scanner.Text())
+			fmt.Println("[MC]", scanner.Text())
 		}
 	}()
 
@@ -58,6 +153,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 		state := "Stopped"
 		if err != nil {
 			state = "Crashed"
+			fmt.Printf("[Launcher] Minecraft exited with error: %v\n", err)
 		}
 		runtime.EventsEmit(ctx, "instance:state", map[string]interface{}{
 			"id":    inst.ID,
@@ -66,4 +162,44 @@ func Launch(ctx context.Context, inst *Instance) error {
 	}()
 
 	return nil
+}
+
+// buildClasspath constructs the Java classpath from installed libraries + client jar
+func buildClasspath(instanceDir string, info *mojang.VersionInfo) string {
+	var paths []string
+
+	for _, lib := range info.Libraries {
+		if !mojang.IsLibraryAllowed(lib) {
+			continue
+		}
+		if lib.Downloads.Artifact.Path == "" {
+			continue
+		}
+		// Skip native-only jars from classpath (they're extracted separately)
+		if strings.Contains(lib.Name, "natives-") {
+			continue
+		}
+		libPath := filepath.Join(instanceDir, "libraries", lib.Downloads.Artifact.Path)
+		if _, err := os.Stat(libPath); err == nil {
+			paths = append(paths, libPath)
+		}
+	}
+
+	// Add the client jar
+	clientJar := filepath.Join(instanceDir, "bin", info.ID+".jar")
+	paths = append(paths, clientJar)
+
+	return strings.Join(paths, ";") // Windows uses semicolon
+}
+
+// substituteVars replaces ${variable} placeholders in arguments
+func substituteVars(args []string, vars map[string]string) []string {
+	result := make([]string, len(args))
+	for i, arg := range args {
+		for k, v := range vars {
+			arg = strings.ReplaceAll(arg, k, v)
+		}
+		result[i] = arg
+	}
+	return result
 }

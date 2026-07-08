@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
+  import { GetExtensionSidebarPages } from '../../wailsjs/go/main/App';
+  import AccountManager from './AccountManager.svelte';
   
   export let activePage: string = 'home';
   
@@ -12,10 +15,40 @@
   ];
   
   const bottomNav = [
-    { id: 'settings', label: 'Settings' },
-    { id: 'account', label: 'Account' }
+    { id: 'settings', label: 'Settings' }
   ];
-  
+
+  let extensionTabs: Array<{ id: string, label: string, url: string }> = [];
+
+  onMount(async () => {
+    // 1. Fetch any tabs that were registered before the frontend loaded
+    try {
+      const cachedTabs = await GetExtensionSidebarPages();
+      if (cachedTabs) {
+        for (const tab of cachedTabs) {
+          if (!extensionTabs.find(t => t.id === tab.id)) {
+            extensionTabs = [...extensionTabs, tab];
+            dispatch('registerExtensionRoute', tab);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load cached extension tabs", e);
+    }
+
+    // 2. Listen for any tabs registered dynamically while running
+    EventsOn('extension:sidebar:add', (payload: any) => {
+      if (!extensionTabs.find(t => t.id === payload.id)) {
+        extensionTabs = [...extensionTabs, payload];
+        dispatch('registerExtensionRoute', payload);
+      }
+    });
+  });
+
+  onDestroy(() => {
+    EventsOff('extension:sidebar:add');
+  });
+
   function navigate(pageId: string) {
     dispatch('navigate', pageId);
   }
@@ -33,6 +66,19 @@
         {item.label}
       </button>
     {/each}
+
+    {#if extensionTabs.length > 0}
+      <div class="nav-divider"></div>
+      <div class="nav-section-title">Extensions</div>
+      {#each extensionTabs as tab}
+        <button 
+          class="nav-item extension {activePage === tab.id ? 'active' : ''}" 
+          on:click={() => navigate(tab.id)}
+        >
+          {tab.label}
+        </button>
+      {/each}
+    {/if}
   </nav>
   
   <nav class="bottom-nav">
@@ -45,6 +91,8 @@
       </button>
     {/each}
   </nav>
+
+  <AccountManager />
 </aside>
 
 <style>
@@ -104,5 +152,21 @@
     background-color: rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
     font-weight: 600;
+  }
+
+  .nav-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    margin: 8px 16px;
+  }
+
+  .nav-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    padding: 4px 16px;
+    font-weight: 600;
+    margin-top: 4px;
   }
 </style>

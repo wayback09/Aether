@@ -1,18 +1,21 @@
 package extensions
 
 import (
+	"context"
 	"fmt"
 	"github.com/dop251/goja"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Sandbox represents an isolated JavaScript environment for an extension
 type Sandbox struct {
+	ctx      context.Context
 	vm       *goja.Runtime
 	manifest Manifest
 }
 
-// NewSandbox creates a new V8/Goja isolate restricted by the given manifest
-func NewSandbox(manifest Manifest) *Sandbox {
+// NewSandbox creates a new Goja isolate restricted by the given manifest
+func NewSandbox(ctx context.Context, manifest Manifest, serverURL string, onSidebarPage func(map[string]interface{})) *Sandbox {
 	vm := goja.New()
 	
 	// Create the secure Aether bridge object
@@ -23,8 +26,27 @@ func NewSandbox(manifest Manifest) *Sandbox {
 		uiObj := vm.NewObject()
 		uiObj.Set("registerSidebarPage", func(call goja.FunctionCall) goja.Value {
 			if len(call.Arguments) > 0 {
-				arg := call.Argument(0).Export()
-				fmt.Printf("[Sandbox:%s] Registered sidebar page: %+v\n", manifest.ID, arg)
+				arg := call.Argument(0).Export().(map[string]interface{})
+				
+				// Reconstruct the URL using the local server
+				// E.g., if arg["url"] is "ui/index.html", we prepend "http://127.0.0.1:port/modrinth/ui/index.html"
+				relURL := arg["url"].(string)
+				fullURL := fmt.Sprintf("%s/%s/%s", serverURL, manifest.ID, relURL)
+				
+				payload := map[string]interface{}{
+					"extensionId": manifest.ID,
+					"id":          arg["id"],
+					"label":       arg["label"],
+					"url":         fullURL,
+				}
+				
+				fmt.Printf("[Sandbox:%s] Registered sidebar page: %+v\n", manifest.ID, payload)
+				
+				if onSidebarPage != nil {
+					onSidebarPage(payload)
+				}
+				
+				runtime.EventsEmit(ctx, "extension:sidebar:add", payload)
 			}
 			return goja.Undefined()
 		})
@@ -48,6 +70,7 @@ func NewSandbox(manifest Manifest) *Sandbox {
 	vm.Set("Aether", aetherObj)
 	
 	return &Sandbox{
+		ctx:      ctx,
 		vm:       vm,
 		manifest: manifest,
 	}

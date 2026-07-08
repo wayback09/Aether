@@ -1,25 +1,49 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { GetExtensions } from '../../wailsjs/go/main/App.js';
+  import { GetExtensions, SelectAndInstallExtension } from '../../wailsjs/go/main/App.js';
 
   let extensions: any[] = [];
+  let isInstalling = false;
 
-  onMount(async () => {
-    extensions = await GetExtensions();
-  });
+  async function loadExtensions() {
+    const res = await GetExtensions();
+    extensions = res || [];
+  }
+
+  async function handleInstall() {
+    if (isInstalling) return;
+    isInstalling = true;
+    try {
+      const installed = await SelectAndInstallExtension();
+      if (installed) {
+        await loadExtensions(); // Refresh the list
+      }
+    } catch (e) {
+      console.error("Installation failed:", e);
+      // TODO: show notification via Wails event or UI store
+    } finally {
+      isInstalling = false;
+    }
+  }
+
+  onMount(loadExtensions);
 </script>
 
 <div class="page">
   <header class="page-header">
     <h1>Extensions</h1>
-    <button class="btn btn-primary">Browse Extensions</button>
+    <button class="btn btn-primary" on:click={handleInstall} disabled={isInstalling}>
+      {isInstalling ? 'Installing...' : 'Browse Extensions'}
+    </button>
   </header>
 
   {#if extensions.length === 0}
     <div class="empty-state">
       <h3>No Extensions Installed</h3>
       <p>Install your first extension to add new functionality.</p>
-      <button class="btn btn-primary" style="margin-top: var(--spacing-md)">Browse Extensions</button>
+      <button class="btn btn-primary" style="margin-top: var(--spacing-md)" on:click={handleInstall} disabled={isInstalling}>
+        {isInstalling ? 'Installing...' : 'Browse Extensions'}
+      </button>
     </div>
   {:else}
     <div class="grid">

@@ -15,16 +15,17 @@ type Instance struct {
 	Loader     string `json:"loader"`
 	Memory     string `json:"memory"`
 	LastPlayed string `json:"lastPlayed"`
+	Installed  bool   `json:"installed"`
 }
 
 // GetInstances returns a list of instances parsed from the disk
 func GetInstances() []Instance {
 	instancesDir := filepath.Join(fs.GetDataDir(), "instances")
-	var instances []Instance
+	instances := []Instance{} // Initialize as empty slice, not nil
 
 	entries, err := os.ReadDir(instancesDir)
 	if err != nil {
-		return []Instance{}
+		return instances
 	}
 
 	for _, entry := range entries {
@@ -36,6 +37,11 @@ func GetInstances() []Instance {
 				if err := json.Unmarshal(data, &inst); err == nil {
 					if inst.ID == "" {
 						inst.ID = entry.Name()
+					}
+					// Check if client.jar exists
+					jarPath := filepath.Join(instancesDir, entry.Name(), "bin", inst.Version+".jar")
+					if _, err := os.Stat(jarPath); err == nil {
+						inst.Installed = true
 					}
 					instances = append(instances, inst)
 				}

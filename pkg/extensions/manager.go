@@ -1,6 +1,7 @@
 package extensions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,23 +12,35 @@ import (
 
 // Manager handles the lifecycle of all extensions
 type Manager struct {
+	ctx              context.Context
+	serverURL        string
 	LoadedExtensions map[string]Extension
 	sandboxes        map[string]*Sandbox
+	SidebarPages     []map[string]interface{}
 }
 
 // GlobalManager holds the singleton instance for UI access
 var GlobalManager *Manager
 
 // NewManager creates a new extension manager
-func NewManager() *Manager {
+func NewManager(ctx context.Context) *Manager {
 	return &Manager{
+		ctx:              ctx,
 		LoadedExtensions: make(map[string]Extension),
 		sandboxes:        make(map[string]*Sandbox),
+		SidebarPages:     make([]map[string]interface{}, 0),
 	}
 }
 
 // LoadAll scans the directory, parses manifests, and executes the JS isolate
 func (m *Manager) LoadAll() error {
+	// Start the local extension server
+	server := NewServer()
+	url, err := server.Start()
+	if err != nil {
+		fmt.Printf("[Extensions] Warning: Failed to start UI server: %v\n", err)
+	}
+	m.serverURL = url
 	extDir := filepath.Join(fs.GetDataDir(), "extensions")
 	entries, err := os.ReadDir(extDir)
 	if err != nil {
@@ -61,7 +74,9 @@ func (m *Manager) LoadAll() error {
 				CPU:     "0%",
 			}
 
-			sandbox := NewSandbox(manifest)
+			sandbox := NewSandbox(m.ctx, manifest, m.serverURL, func(payload map[string]interface{}) {
+				m.SidebarPages = append(m.SidebarPages, payload)
+			})
 			m.sandboxes[manifest.ID] = sandbox
 
 			if manifest.Main != "" {
@@ -93,4 +108,9 @@ func (m *Manager) GetExtensions() []Extension {
 		list = append(list, ext)
 	}
 	return list
+}
+
+// GetSidebarPages returns all registered sidebar pages
+func (m *Manager) GetSidebarPages() []map[string]interface{} {
+	return m.SidebarPages
 }

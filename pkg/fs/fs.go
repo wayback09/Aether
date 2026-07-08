@@ -22,12 +22,18 @@ func GetDataDir() string {
 	return filepath.Join(configDir, "Aether")
 }
 
+// GetAssetsDir returns the shared assets directory path
+func GetAssetsDir() string {
+	return filepath.Join(GetDataDir(), "assets")
+}
+
 // EnsureDirectories creates the required directory structure if it doesn't exist
 func EnsureDirectories() error {
 	base := GetDataDir()
 	dirs := []string{
 		filepath.Join(base, "instances"),
 		filepath.Join(base, "extensions"),
+		filepath.Join(base, "assets"),
 		filepath.Join(base, "logs"),
 	}
 
