@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { GetExtensions, SelectAndInstallExtension } from '../../wailsjs/go/main/App.js';
+  import { GetExtensions, SelectAndInstallExtension, DownloadAndInstallExtension } from '../../wailsjs/go/main/App.js';
   import EmptyState from '../components/EmptyState.svelte';
 
   let installedExtensions: any[] = [];
@@ -10,8 +10,8 @@
   let galleryError = '';
   let galleryLoading = false;
 
-  // Placeholder for the future GitHub repo
-  const GALLERY_INDEX_URL = 'https://raw.githubusercontent.com/YourUsername/Aether-Extensions/main/index.json';
+  // Real GitHub URL for the Aether Extension Registry
+  const GALLERY_INDEX_URL = 'https://raw.githubusercontent.com/wayback09/Aether-Extensions/main/index.json';
 
   async function loadInstalled() {
     try {
@@ -54,6 +54,26 @@
     }
   }
 
+  let installingId = '';
+  async function handleRemoteInstall(url: string, extId: string) {
+    if (isInstalling) return;
+    isInstalling = true;
+    installingId = extId;
+    try {
+      const installed = await DownloadAndInstallExtension(url);
+      if (installed) {
+        await loadInstalled();
+        activeTab = 'installed';
+      }
+    } catch (e) {
+      console.error('Remote installation failed:', e);
+      alert('Failed to install extension: ' + e);
+    } finally {
+      isInstalling = false;
+      installingId = '';
+    }
+  }
+
   onMount(loadInstalled);
 
   function setTab(tab: string) {
@@ -65,11 +85,10 @@
 
   function trustBadge(trust: string | undefined): { cls: string; label: string } {
     switch (trust) {
-      case 'official':  return { cls: 'badge-official',  label: 'Official' };
-      case 'verified':  return { cls: 'badge-verified',  label: 'Verified' };
-      case 'local':     return { cls: 'badge-experimental', label: 'Local' };
-      case 'community':
-      default:          return { cls: 'badge-community', label: 'Community' };
+      case 'official':  return { cls: 'badge-official',   label: 'Official'   };
+      case 'verified':  return { cls: 'badge-verified',   label: 'Verified'   };
+      case 'community': return { cls: 'badge-community',  label: 'Community'  };
+      default:          return { cls: 'badge-local',      label: 'Local'      };
     }
   }
 
@@ -209,7 +228,13 @@
               <p class="ext-desc">{ext.description}</p>
               
               <div class="ext-footer">
-                <button class="btn btn-primary" on:click={() => alert('Remote install coming soon!')}>Install</button>
+                {#if installedExtensions.find(e => e.id === ext.id)}
+                  <button class="btn btn-secondary" disabled>Installed</button>
+                {:else}
+                  <button class="btn btn-primary" on:click={() => handleRemoteInstall(ext.url, ext.id)} disabled={isInstalling}>
+                    {installingId === ext.id ? 'Installing...' : 'Install'}
+                  </button>
+                {/if}
               </div>
             </div>
           </div>
@@ -220,6 +245,20 @@
 </div>
 
 <style>
+  .page {
+    padding: var(--spacing-xl);
+    height: 100%;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xl);
+  }
+
   .header-actions {
     display: flex;
     align-items: center;
@@ -410,8 +449,8 @@
     letter-spacing: 0.5px;
   }
 
-  .badge-official { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-  .badge-verified { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-  .badge-community { background: rgba(255, 255, 255, 0.05); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
-  .badge-experimental { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+  .badge-official  { background: rgba(59, 130, 246, 0.15);  color: #60a5fa;  border: 1px solid rgba(59, 130, 246, 0.35);  }
+  .badge-verified  { background: rgba(16, 185, 129, 0.15);  color: #34d399;  border: 1px solid rgba(16, 185, 129, 0.35);  }
+  .badge-community { background: rgba(168, 85, 247, 0.12);  color: #c084fc;  border: 1px solid rgba(168, 85, 247, 0.3);   }
+  .badge-local     { background: rgba(245, 158, 11, 0.12);  color: #fbbf24;  border: 1px solid rgba(245, 158, 11, 0.3);   }
 </style>

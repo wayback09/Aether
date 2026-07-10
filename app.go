@@ -156,6 +156,19 @@ func (a *App) SelectAndInstallExtension() (bool, error) {
 	return true, nil
 }
 
+// DownloadAndInstallExtension downloads a remote zip and installs it
+func (a *App) DownloadAndInstallExtension(url string) (bool, error) {
+	if err := extensions.DownloadAndInstallExtension(url); err != nil {
+		return false, err
+	}
+
+	if extensions.GlobalManager != nil {
+		extensions.GlobalManager.LoadAll()
+	}
+
+	return true, nil
+}
+
 
 func (a *App) GetActiveAccount() *auth.Account {
 	return auth.GetActiveAccount()
