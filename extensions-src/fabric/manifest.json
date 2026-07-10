@@ -1,8 +1,8 @@
 {
   "id": "fabric",
-  "name": "Fabric Mod Loader",
-  "version": "1.0.0",
-  "author": "Aether",
+  "name": "Fabric",
+  "version": "1.1.0",
+  "author": "Aether Team",
   "description": "Adds support for launching the Fabric mod loader.",
   "main": "main.js",
   "permissions": [

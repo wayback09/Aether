@@ -23,7 +23,6 @@
   }
 
   async function loadGallery() {
-    if (galleryExtensions.length > 0) return;
     galleryLoading = true;
     galleryError = '';
     try {
@@ -32,7 +31,7 @@
       galleryExtensions = await res.json();
     } catch (e) {
       console.error('Failed to load gallery:', e);
-      galleryError = 'Could not reach the Extension Gallery. Check back later once the GitHub repository is set up!';
+      galleryError = 'Could not reach the Extension Gallery. Make sure you are connected to the internet.';
     } finally {
       galleryLoading = false;
     }
@@ -218,6 +217,8 @@
                 <div class="ext-info">
                   <div class="ext-title-row">
                     <h3 class="ext-title">{ext.name} <span class="ext-version">v{ext.version}</span></h3>
+                    {@const b = trustBadge(ext.trust)}
+                    <span class="badge {b.cls}">{b.label}</span>
                   </div>
                   <div class="ext-meta">
                     <span class="ext-author">by {ext.author}</span>
