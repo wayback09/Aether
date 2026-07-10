@@ -217,8 +217,7 @@
                 <div class="ext-info">
                   <div class="ext-title-row">
                     <h3 class="ext-title">{ext.name} <span class="ext-version">v{ext.version}</span></h3>
-                    {@const b = trustBadge(ext.trust)}
-                    <span class="badge {b.cls}">{b.label}</span>
+                    <span class="badge {trustBadge(ext.trust).cls}">{trustBadge(ext.trust).label}</span>
                   </div>
                   <div class="ext-meta">
                     <span class="ext-author">by {ext.author}</span>

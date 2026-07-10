@@ -5,15 +5,16 @@ package extensions
 
 // Extension represents the UI representation of a Manifest
 type Extension struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Author  string `json:"author"`
-	Status  string `json:"status"`
-	Memory  string `json:"memory"`
-	CPU     string `json:"cpu"`
-	Trust   string `json:"trust"`
-	IconURL string `json:"iconUrl,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Author      string `json:"author"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	Memory      string `json:"memory"`
+	CPU         string `json:"cpu"`
+	Trust       string `json:"trust"`
+	IconURL     string `json:"iconUrl,omitempty"`
 }
 
 // GetExtensions returns all installed extensions

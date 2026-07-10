@@ -94,15 +94,16 @@ func (m *Manager) LoadAll() error {
 			}
 
 			ext := Extension{
-				ID:      manifest.ID,
-				Name:    manifest.Name,
-				Version: manifest.Version,
-				Author:  manifest.Author,
-				Status:  "Running",
-				Memory:  "0MB",
-				CPU:     "0%",
-				Trust:   trust,
-				IconURL: iconUrl,
+				ID:          manifest.ID,
+				Name:        manifest.Name,
+				Version:     manifest.Version,
+				Author:      manifest.Author,
+				Description: manifest.Description,
+				Status:      "Running",
+				Memory:      "0MB",
+				CPU:         "0%",
+				Trust:       trust,
+				IconURL:     iconUrl,
 			}
 
 			sandbox := NewSandbox(
