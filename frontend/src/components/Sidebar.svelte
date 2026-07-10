@@ -22,7 +22,7 @@
   let extensionTabs: Array<{ id: string; label: string; url: string; icon?: string }> = [];
 
   onMount(async () => {
-    // 1. Fetch any tabs that were registered before the frontend loaded
+    // Fetch extension UI tabs registered during backend startup
     try {
       const cachedTabs = await GetExtensionSidebarPages();
       if (cachedTabs) {
@@ -37,7 +37,7 @@
       console.error('Failed to load cached extension tabs', e);
     }
 
-    // 2. Listen for any tabs registered dynamically while running
+    // Listen for extension UI tabs registered dynamically at runtime
     EventsOn('extension:sidebar:add', (payload: any) => {
       if (!extensionTabs.find((t) => t.id === payload.id)) {
         extensionTabs = [...extensionTabs, payload];

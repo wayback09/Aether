@@ -23,7 +23,7 @@ type AssetObject struct {
 
 // DownloadAssets fetches the asset index and downloads all game assets to a shared directory.
 func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetIndex, assetsDir string) error {
-	// 1. Download the asset index JSON
+	// Download the asset index JSON
 	indexDir := filepath.Join(assetsDir, "indexes")
 	if err := os.MkdirAll(indexDir, 0755); err != nil {
 		return err
@@ -34,7 +34,7 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 		return fmt.Errorf("failed to download asset index: %w", err)
 	}
 
-	// 2. Parse the asset index
+	// Parse the asset index
 	data, err := os.ReadFile(indexPath)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 		return fmt.Errorf("failed to parse asset index: %w", err)
 	}
 
-	// 3. Download all asset objects concurrently
+	// Download all asset objects concurrently
 	objectsDir := filepath.Join(assetsDir, "objects")
 	totalAssets := len(indexData.Objects)
 	var completed int

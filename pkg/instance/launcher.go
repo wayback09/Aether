@@ -23,24 +23,24 @@ func Launch(ctx context.Context, inst *Instance) error {
 	instanceDir := filepath.Join(fs.GetDataDir(), "instances", inst.ID)
 	assetsDir := fs.GetAssetsDir()
 
-	// 1. Determine the required Java version for this Minecraft version
+	// Determine the required Java version for this Minecraft version
 	requiredJava := java.RequiredJavaVersion(inst.Version)
 	fmt.Printf("[Launcher] Minecraft %s requires Java >= %d\n", inst.Version, requiredJava)
 
 	var javaPath string
 
-	// 2a. Fast path: use already-managed JRE if present
+	// Fast path: use already-managed JRE if present
 	if java.IsManagedJavaInstalled(requiredJava) {
 		javaPath = java.GetManagedJavaPath(requiredJava)
 		fmt.Printf("[Launcher] Using managed JRE: %s\n", javaPath)
 	} else {
-		// 2b. Try to find a compatible system Java
+		// Try to find a compatible system Java
 		systemJava, err := java.FindJava(requiredJava)
 		if err == nil {
 			javaPath = systemJava
 			fmt.Printf("[Launcher] Using system Java: %s\n", javaPath)
 		} else {
-			// 2c. Download a managed JRE from Adoptium
+			// Download a managed JRE from Adoptium
 			fmt.Printf("[Launcher] No compatible Java found, downloading Java %d...\n", requiredJava)
 			if dlErr := java.DownloadJava(ctx, requiredJava); dlErr != nil {
 				return fmt.Errorf("failed to download Java %d: %w", requiredJava, dlErr)
@@ -51,7 +51,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 
 	fmt.Printf("[Launcher] Using Java: %s\n", javaPath)
 
-	// 2. Load saved version.json
+	// Load saved version.json
 	versionPath := filepath.Join(instanceDir, "version.json")
 	versionData, err := os.ReadFile(versionPath)
 	if err != nil {
@@ -63,13 +63,13 @@ func Launch(ctx context.Context, inst *Instance) error {
 		return fmt.Errorf("failed to parse version.json: %w", err)
 	}
 
-	// 3. Build classpath
+	// Build classpath
 	classpath := buildClasspath(instanceDir, &versionInfo)
 
-	// 4. Build native directory path
+	// Build native directory path
 	nativesDir := filepath.Join(instanceDir, "natives")
 
-	// 5. Build argument variable replacements
+	// Build argument variable replacements
 	activeAccount := auth.GetActiveAccount()
 	username := "Player"
 	uuid := auth.GenerateOfflineUUID(username)
@@ -104,7 +104,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 		"${path}":             filepath.Join(instanceDir, versionInfo.Logging.Client.File.ID),
 	}
 
-	// 5b. Mod Loader Interception
+	// Mod Loader Interception
 	mainClass := versionInfo.MainClass
 	cpArray := strings.Split(classpath, string(os.PathListSeparator))
 
@@ -139,7 +139,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 		vars["${classpath}"] = strings.Join(cpArray, string(os.PathListSeparator))
 	}
 
-	// 6. Resolve JVM arguments from version JSON
+	// Resolve JVM arguments from version JSON
 	jvmArgs := mojang.ResolveArguments(versionInfo.Arguments.JVM)
 	jvmArgs = substituteVars(jvmArgs, vars)
 
@@ -159,11 +159,11 @@ func Launch(ctx context.Context, inst *Instance) error {
 		}
 	}
 
-	// 7. Resolve game arguments from version JSON
+	// Resolve game arguments from version JSON
 	gameArgs := mojang.ResolveArguments(versionInfo.Arguments.Game)
 	gameArgs = substituteVars(gameArgs, vars)
 
-	// 8. Construct full command: java [jvm args] mainClass [game args]
+	// Construct full command: java [jvm args] mainClass [game args]
 	args := append(jvmArgs, mainClass)
 	args = append(args, gameArgs...)
 

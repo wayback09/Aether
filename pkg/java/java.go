@@ -78,7 +78,7 @@ func GetMajorVersion(javaPath string) (int, error) {
 // Checks managed runtimes first, then JAVA_HOME, then PATH, then
 // common Windows install directories.
 func FindJava(minVersion int) (string, error) {
-	// 1. Check JAVA_HOME
+	// Check JAVA_HOME
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome != "" {
 		for _, name := range []string{"java.exe", "java"} {
@@ -89,14 +89,14 @@ func FindJava(minVersion int) (string, error) {
 		}
 	}
 
-	// 2. Check PATH
+	// Check PATH
 	if pathJava, err := exec.LookPath("java"); err == nil {
 		if isCompatible(pathJava, minVersion) {
 			return pathJava, nil
 		}
 	}
 
-	// 3. Common Windows install paths
+	// Common Windows install paths
 	for _, base := range []string{
 		os.Getenv("ProgramFiles"),
 		os.Getenv("ProgramFiles(x86)"),

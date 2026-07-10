@@ -3,15 +3,38 @@
   import { GetExtensions, SelectAndInstallExtension } from '../../wailsjs/go/main/App.js';
   import EmptyState from '../components/EmptyState.svelte';
 
-  let extensions: any[] = [];
+  let installedExtensions: any[] = [];
+  let galleryExtensions: any[] = [];
   let isInstalling = false;
+  let activeTab = 'installed'; // 'installed' or 'gallery'
+  let galleryError = '';
+  let galleryLoading = false;
 
-  async function loadExtensions() {
+  // Placeholder for the future GitHub repo
+  const GALLERY_INDEX_URL = 'https://raw.githubusercontent.com/YourUsername/Aether-Extensions/main/index.json';
+
+  async function loadInstalled() {
     try {
       const exts = await GetExtensions();
-      extensions = exts || [];
+      installedExtensions = exts || [];
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  async function loadGallery() {
+    if (galleryExtensions.length > 0) return;
+    galleryLoading = true;
+    galleryError = '';
+    try {
+      const res = await fetch(GALLERY_INDEX_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      galleryExtensions = await res.json();
+    } catch (e) {
+      console.error('Failed to load gallery:', e);
+      galleryError = 'Could not reach the Extension Gallery. Check back later once the GitHub repository is set up!';
+    } finally {
+      galleryLoading = false;
     }
   }
 
@@ -20,7 +43,10 @@
     isInstalling = true;
     try {
       const installed = await SelectAndInstallExtension();
-      if (installed) await loadExtensions();
+      if (installed) {
+        await loadInstalled();
+        activeTab = 'installed';
+      }
     } catch (e) {
       console.error('Installation failed:', e);
     } finally {
@@ -28,7 +54,14 @@
     }
   }
 
-  onMount(loadExtensions);
+  onMount(loadInstalled);
+
+  function setTab(tab: string) {
+    activeTab = tab;
+    if (tab === 'gallery') {
+      loadGallery();
+    }
+  }
 
   function trustBadge(trust: string | undefined): { cls: string; label: string } {
     switch (trust) {
@@ -66,97 +99,183 @@
 <div class="page page-enter">
   <header class="page-header">
     <h1>Extensions</h1>
-    <button class="btn btn-secondary" on:click={handleLocalInstall} disabled={isInstalling}>
-      {isInstalling ? 'Installing...' : 'Install from .zip'}
-    </button>
+    <div class="header-actions">
+      <div class="tabs">
+        <button class="tab-btn {activeTab === 'installed' ? 'active' : ''}" on:click={() => setTab('installed')}>Installed</button>
+        <button class="tab-btn {activeTab === 'gallery' ? 'active' : ''}" on:click={() => setTab('gallery')}>Gallery</button>
+      </div>
+      <button class="btn btn-secondary" on:click={handleLocalInstall} disabled={isInstalling}>
+        {isInstalling ? 'Installing...' : 'Install from .zip'}
+      </button>
+    </div>
   </header>
 
-  {#if extensions.length === 0}
-    <EmptyState
-      icon="puzzle"
-      title="No extensions installed"
-      description="Install a .zip extension to add new capabilities to Aether. The Extension Gallery is coming soon."
-      actionLabel="Install from .zip"
-      on:action={handleLocalInstall}
-    />
-  {:else}
-    <div class="grid">
-      {#each extensions as ext}
-        {@const badge = trustBadge(ext.trust)}
-        {@const grad  = extGradient(ext.name)}
-        {@const dot   = statusColor(ext.status)}
+  {#if activeTab === 'installed'}
+    {#if installedExtensions.length === 0}
+      <EmptyState
+        icon="puzzle"
+        title="No extensions installed"
+        description="Install a .zip extension or visit the Gallery to add new capabilities to Aether."
+        actionLabel="Browse Gallery"
+        on:action={() => setTab('gallery')}
+      />
+    {:else}
+      <div class="grid">
+        {#each installedExtensions as ext}
+          {@const badge = trustBadge(ext.trust)}
+          {@const grad  = extGradient(ext.name)}
+          {@const dot   = statusColor(ext.status)}
 
-        <div class="card ext-card">
-          <div class="card-accent" style="background: {grad};"></div>
-          <div class="card-body">
-            <div class="ext-header">
-              <div class="ext-icon" style={!ext.iconUrl ? `background: ${grad};` : ''}>
-                {#if ext.iconUrl}
-                  <img src={ext.iconUrl} alt={ext.name} class="ext-icon-img" />
-                {:else}
-                  <span class="ext-icon-letter">{ext.name.charAt(0).toUpperCase()}</span>
-                {/if}
-              </div>
-              <div class="ext-info">
-                <div class="ext-name-row">
-                  <span class="ext-name">{ext.name}</span>
-                </div>
-                <div class="ext-badges">
-                  <span class="badge {badge.cls}">{badge.label}</span>
-                  {#if ext.version}
-                    <span class="badge badge-version">v{ext.version}</span>
+          <div class="card ext-card">
+            <div class="card-accent" style="background: {grad};"></div>
+            <div class="card-body">
+              <div class="ext-header">
+                <div class="ext-icon" style={!ext.iconUrl ? `background: ${grad};` : ''}>
+                  {#if ext.iconUrl}
+                    <img src={ext.iconUrl} alt={ext.name} class="ext-icon-img" />
+                  {:else}
+                    <span class="ext-icon-letter">{ext.name.charAt(0).toUpperCase()}</span>
                   {/if}
                 </div>
-                <div class="ext-author">by {ext.author}</div>
+                <div class="ext-info">
+                  <div class="ext-title-row">
+                    <h3 class="ext-title">{ext.name} <span class="ext-version">v{ext.version}</span></h3>
+                    <span class="badge {badge.cls}">{badge.label}</span>
+                  </div>
+                  <div class="ext-meta">
+                    <span class="ext-author">by {ext.author}</span>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div class="ext-stats">
-              <div class="stat">
-                <span class="status-dot" style="background: {dot};"></span>
-                <span class="stat-value">{ext.status}</span>
+              <p class="ext-desc">{ext.description}</p>
+              
+              <div class="ext-footer">
+                <div class="ext-status-wrap">
+                  <div class="ext-status-dot" style="background: {dot}; box-shadow: 0 0 6px {dot};"></div>
+                  <span class="ext-status-text">{ext.status || 'Active'}</span>
+                </div>
+                <!-- TODO: Settings / Uninstall buttons -->
               </div>
-              <div class="stat">
-                <span class="stat-label">Memory</span>
-                <span class="stat-value">{ext.memory || '0 MB'}</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">CPU</span>
-                <span class="stat-value">{ext.cpu || '0%'}</span>
-              </div>
-            </div>
-
-            <div class="card-actions">
-              <button class="btn btn-secondary">Settings</button>
-              <button class="btn btn-secondary">Restart</button>
-              <button class="btn btn-danger">Disable</button>
             </div>
           </div>
-        </div>
-      {/each}
-    </div>
+        {/each}
+      </div>
+    {/if}
+  {/if}
+
+  {#if activeTab === 'gallery'}
+    {#if galleryLoading}
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading Extension Gallery...</p>
+      </div>
+    {:else if galleryError}
+      <EmptyState
+        icon="wifi-off"
+        title="Gallery Unavailable"
+        description={galleryError}
+        actionLabel="Try Again"
+        on:action={loadGallery}
+      />
+    {:else if galleryExtensions.length === 0}
+      <EmptyState
+        icon="search"
+        title="No Extensions Found"
+        description="The gallery is currently empty."
+      />
+    {:else}
+      <div class="grid">
+        {#each galleryExtensions as ext}
+          {@const grad = extGradient(ext.name)}
+          
+          <div class="card ext-card">
+            <div class="card-accent" style="background: {grad};"></div>
+            <div class="card-body">
+              <div class="ext-header">
+                <div class="ext-icon" style="background: {grad};">
+                  <span class="ext-icon-letter">{ext.name.charAt(0).toUpperCase()}</span>
+                </div>
+                <div class="ext-info">
+                  <div class="ext-title-row">
+                    <h3 class="ext-title">{ext.name} <span class="ext-version">v{ext.version}</span></h3>
+                  </div>
+                  <div class="ext-meta">
+                    <span class="ext-author">by {ext.author}</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="ext-desc">{ext.description}</p>
+              
+              <div class="ext-footer">
+                <button class="btn btn-primary" on:click={() => alert('Remote install coming soon!')}>Install</button>
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>
 
 <style>
-  .page {
-    padding: var(--spacing-xl);
-    height: 100%;
-    box-sizing: border-box;
-    overflow-y: auto;
-  }
-
-  .page-header {
+  .header-actions {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-xl);
+    gap: 16px;
   }
 
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: var(--spacing-lg);
+  .tabs {
+    display: flex;
+    background: rgba(255,255,255,0.05);
+    padding: 4px;
+    border-radius: 8px;
+  }
+  
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .tab-btn:hover {
+    color: rgba(255,255,255,0.8);
+  }
+
+  .tab-btn.active {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+    color: rgba(255,255,255,0.5);
+    gap: 16px;
+  }
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   .ext-card {
@@ -168,121 +287,131 @@
   }
 
   .card-accent {
-    height: 3px;
+    height: 4px;
     width: 100%;
-    flex-shrink: 0;
   }
 
   .card-body {
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
+    gap: 16px;
     flex: 1;
   }
 
   .ext-header {
     display: flex;
-    gap: var(--spacing-md);
-    align-items: flex-start;
+    gap: 16px;
+    align-items: center;
   }
 
   .ext-icon {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .ext-icon-letter {
-    font-size: 20px;
-    font-weight: 800;
-    color: rgba(255, 255, 255, 0.92);
-    line-height: 1;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   }
 
   .ext-icon-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 10px;
+  }
+
+  .ext-icon-letter {
+    font-size: 24px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
   }
 
   .ext-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    flex: 1;
     min-width: 0;
   }
 
-  .ext-name-row {
+  .ext-title-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
   }
 
-  .ext-name {
-    font-size: 15px;
+  .ext-title {
+    margin: 0;
+    font-size: 16px;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .ext-badges {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
+  .ext-version {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.3);
+    margin-left: 4px;
   }
 
   .ext-author {
-    font-size: 12px;
-    color: var(--text-meta);
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
   }
 
-  .ext-stats {
-    display: flex;
-    gap: var(--spacing-md);
-    background: rgba(0, 0, 0, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    padding: 10px 12px;
-    border-radius: var(--border-radius);
-    font-size: 12px;
+  .ext-desc {
+    margin: 0;
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.5;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
-  .stat {
+  .ext-footer {
     display: flex;
     align-items: center;
-    gap: 5px;
-  }
-
-  .stat-label {
-    color: var(--text-secondary);
-  }
-
-  .stat-value {
-    color: var(--text-primary);
-    font-weight: 500;
-  }
-
-  .status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .card-actions {
-    display: flex;
-    gap: var(--spacing-sm);
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.05);
     margin-top: auto;
   }
 
-  .card-actions .btn {
-    flex: 1;
+  .ext-status-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
+
+  .ext-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .ext-status-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-official { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+  .badge-verified { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .badge-community { background: rgba(255, 255, 255, 0.05); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
+  .badge-experimental { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
 </style>

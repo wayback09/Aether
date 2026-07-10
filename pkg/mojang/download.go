@@ -59,7 +59,7 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 		})
 	}
 
-	// 1. Download Client Jar
+	// Download Client Jar
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -71,7 +71,7 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 		reportProgress("client.jar", "Core")
 	}()
 
-	// 2. Download Libraries concurrently
+	// Download Libraries concurrently
 	sem := make(chan struct{}, 10)
 
 	for _, lib := range allowedLibs {
@@ -99,7 +99,7 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 		}
 	}
 
-	// 3. Download Assets
+	// Download Assets
 	runtime.EventsEmit(e.ctx, "instance:progress", map[string]interface{}{
 		"id":       e.instance,
 		"progress": 50,
@@ -110,7 +110,7 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 		return fmt.Errorf("asset download error: %w", err)
 	}
 
-	// 4. Extract Native Libraries
+	// Extract Native Libraries
 	runtime.EventsEmit(e.ctx, "instance:progress", map[string]interface{}{
 		"id":       e.instance,
 		"progress": 90,
@@ -123,7 +123,7 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 		return fmt.Errorf("native extraction error: %w", err)
 	}
 
-	// 5. Download Log4j config file
+	// Download Log4j config file
 	if info.Logging.Client.File.URL != "" {
 		logConfigPath := filepath.Join(e.basePath, info.Logging.Client.File.ID)
 		if err := e.downloadFile(info.Logging.Client.File.URL, logConfigPath); err != nil {
@@ -132,7 +132,7 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 		}
 	}
 
-	// 6. Save version.json to disk (needed by launcher to read mainClass, arguments, etc.)
+	// Save version.json to disk (required for launcher to resolve arguments)
 	versionData, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal version info: %w", err)
@@ -191,11 +191,10 @@ func (e *DownloadEngine) downloadFile(url string, dest string) error {
 		}()
 
 		if err == nil {
-			// Successfully downloaded to temp file, rename it to the final destination atomically
-			// We remove the old temp file if it's there, but os.Rename overwrites in windows mostly,
-			// though it's safer to ensure the tempDest is flushed and closed, which it is due to defer inside the func above.
+			// Rename temporary file to final destination atomically.
+			// Replaces existing file if present.
 			if err := os.Rename(tempDest, dest); err != nil {
-				// Fallback if Rename fails across drives, though usually not an issue here since it's the same dir
+				// Fallback for cross-device rename errors
 				return fmt.Errorf("failed to rename temp file: %w", err)
 			}
 			return nil

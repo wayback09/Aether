@@ -244,9 +244,8 @@ func NewSandbox(
 		// Grab the existing uiObj that was created earlier (or create if somehow nil)
 		uiIPC := vm.NewObject()
 		
-		// sandbox is not yet created, so we store the callback via a pointer trick:
-		// We'll assign onMessageCallback after construction. Here we just store
-		// the JS function reference in a closure so Execute() can call it later.
+		// Sandbox not yet created. Store callback via pointer closure to allow
+		// execution later.
 		var jsMessageHandler goja.Callable
 
 		uiIPC.Set("onMessage", func(call goja.FunctionCall) goja.Value {
@@ -271,12 +270,8 @@ func NewSandbox(
 			aetherObj.Set("ui", uiIPC)
 		}
 
-		// Build the sandbox early so we can set the callback closure
-		// We do this via a deferred post-construction bind below.
-		_ = jsMessageHandler // will be captured in the callback below
-
-		// We'll return a sandbox whose onMessageCallback dispatches into jsMessageHandler
-		_ = jsMessageHandler // suppress unused warning; used in return below
+		// Build sandbox early to assign the deferred callback closure.
+		_ = jsMessageHandler // Captured in callback below
 
 		// Inject the bridge into the global scope
 		vm.Set("Aether", aetherObj)

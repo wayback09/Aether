@@ -3,7 +3,7 @@ Aether.launcher.registerModLoader({
     name: "Fabric",
     description: "Lightweight and fast mod loader",
     onLaunch: function(ctx) {
-        // 1. Fetch the Fabric loader profile for this MC version
+        // Fetch the Fabric loader profile for this MC version
         var metaUrl = "https://meta.fabricmc.net/v2/versions/loader/" + ctx.mcVersion;
         var metaStr = Aether.http.get(metaUrl);
         var metaJson = JSON.parse(metaStr);
@@ -15,7 +15,7 @@ Aether.launcher.registerModLoader({
         var entry = metaJson[0];
         var profile = entry.launcherMeta;
 
-        // 2. Download all required libraries (common + client)
+        // Download all required libraries (common + client)
         var allLibs = [];
         if (profile.libraries.common) {
             for (var i = 0; i < profile.libraries.common.length; i++) {
@@ -45,7 +45,7 @@ Aether.launcher.registerModLoader({
             ctx.classpath.push(localPath);
         }
 
-        // 3. Set the main class
+        // Set the main class
         // In modern Fabric API, mainClass is either a plain string or { client: "...", server: "..." }
         var mc = profile.mainClass;
         if (typeof mc === "string") {

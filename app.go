@@ -186,8 +186,8 @@ func (a *App) LoginWithMicrosoft() error {
 	go func() {
 		var browserPort int
 		
-		// 1. Start local server. This will block until completion,
-		// but it calls our onStart callback as soon as it's listening.
+		// Start local callback server for OAuth loop.
+		// Blocks until completion, but triggers callback once listening.
 		code, err := auth.StartCallbackServer(func(port int) {
 			browserPort = port
 			url := auth.GetMicrosoftAuthURL(port)
@@ -199,20 +199,20 @@ func (a *App) LoginWithMicrosoft() error {
 			return
 		}
 
-		// 2. Exchange code for full token chain
+		// Exchange authorization code for token chain.
 		acc, err := auth.LoginWithMicrosoft(code, browserPort)
 		if err != nil {
 			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
 			return
 		}
 
-		// 3. Save and set as active
+		// Save to keyring and set as active profile.
 		if err := auth.AddMicrosoftAccount(acc); err != nil {
 			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
 			return
 		}
 
-		// 4. Tell frontend we're done
+		// Notify frontend of successful authentication.
 		runtime.EventsEmit(a.ctx, "auth:complete")
 	}()
 	return nil
