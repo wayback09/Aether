@@ -1,12 +1,17 @@
 <script lang="ts">
   import { WindowMinimise, WindowToggleMaximise, Quit } from '../../wailsjs/runtime/runtime.js';
 
+  let isMaximized = false;
+
   function minimize() {
     WindowMinimise();
   }
-  function maximize() {
+
+  function toggleMaximize() {
     WindowToggleMaximise();
+    isMaximized = !isMaximized;
   }
+
   function closeApp() {
     Quit();
   }
@@ -14,25 +19,39 @@
 
 <div class="titlebar" style="--wails-draggable: drag">
   <div class="title">
-    <div class="logo">W</div>
+    <img src="/logo.png" alt="Logo" class="logo-img" />
     <span>Aether</span>
   </div>
-  
+
   <div class="controls" style="--wails-draggable: no-drag">
-    <button class="win-btn" on:click={minimize}>
-      <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1">
-        <line x1="0" y1="5" x2="10" y2="5"></line>
+    <!-- Minimize -->
+    <button class="win-btn" on:click={minimize} title="Minimize">
+      <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.2" fill="none">
+        <line x1="0" y1="5" x2="10" y2="5" />
       </svg>
     </button>
-    <button class="win-btn" on:click={maximize}>
-      <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1" fill="none">
-        <rect x="1.5" y="1.5" width="7" height="7"></rect>
-      </svg>
+
+    <!-- Maximize / Restore — icon toggles on click -->
+    <button class="win-btn" on:click={toggleMaximize} title={isMaximized ? 'Restore' : 'Maximize'}>
+      {#if isMaximized}
+        <!-- Restore icon: two overlapping squares -->
+        <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.2" fill="none">
+          <rect x="0" y="2" width="7" height="7" rx="0.5" />
+          <path d="M2.5 2V1.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H8.5" />
+        </svg>
+      {:else}
+        <!-- Maximize icon: single square -->
+        <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.2" fill="none">
+          <rect x="1" y="1" width="8" height="8" rx="0.5" />
+        </svg>
+      {/if}
     </button>
-    <button class="win-btn close-btn" on:click={closeApp}>
-      <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1">
-        <line x1="1" y1="1" x2="9" y2="9"></line>
-        <line x1="9" y1="1" x2="1" y2="9"></line>
+
+    <!-- Close -->
+    <button class="win-btn close-btn" on:click={closeApp} title="Close">
+      <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.2" fill="none">
+        <line x1="1" y1="1" x2="9" y2="9" />
+        <line x1="9" y1="1" x2="1" y2="9" />
       </svg>
     </button>
   </div>
@@ -48,7 +67,7 @@
     user-select: none;
     -webkit-user-select: none;
     flex-shrink: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    /* border removed */
   }
 
   .title {
@@ -60,15 +79,11 @@
     gap: 8px;
     font-family: inherit;
   }
-  
-  .logo {
-    background: #ffffff;
-    color: #000000;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 2px 4px;
-    border-radius: 2px;
-    line-height: 1;
+
+  .logo-img {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
   }
 
   .controls {
@@ -91,7 +106,7 @@
   }
 
   .win-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
   }
 

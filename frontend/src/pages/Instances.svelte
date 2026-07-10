@@ -1,12 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { GetInstances, GetAvailableVersions, CreateInstance } from '../../wailsjs/go/main/App.js';
+  import { onMount, createEventDispatcher } from 'svelte';
+  import { GetInstances, GetAvailableVersions, CreateInstance, GetModLoaders } from '../../wailsjs/go/main/App.js';
   import Dropdown from '../components/Dropdown.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
+
+  const dispatch = createEventDispatcher();
 
   let instances: any[] = [];
   let showModal = false;
   let newInstance = { name: "", version: "", loader: "Vanilla" };
   let availableVersions: string[] = [];
+  let availableLoaders: any[] = [];
   let isCreating = false;
 
   async function loadInstances() {
@@ -20,16 +24,24 @@
     if (availableVersions.length > 0) {
       newInstance.version = availableVersions[0];
     }
+    
+    const loaders = await GetModLoaders();
+    availableLoaders = [
+      { label: 'Vanilla', value: 'Vanilla' },
+      ...(loaders || []).map(l => ({ label: l.name, value: l.id }))
+    ];
   });
 
   async function handleCreate() {
     if (!newInstance.name || !newInstance.version) return;
     isCreating = true;
     try {
-      await CreateInstance(newInstance.name, newInstance.version, newInstance.loader);
+      const created = await CreateInstance(newInstance.name, newInstance.version, newInstance.loader);
       showModal = false;
       newInstance.name = "";
-      await loadInstances();
+      newInstance.loader = "Vanilla";
+      // Navigate straight to home with the new instance selected
+      dispatch('navigate', `home:instance:${created.id}`);
     } catch (err) {
       console.error(err);
       alert("Failed to create instance: " + err);
@@ -49,11 +61,13 @@
   </header>
 
   {#if instances.length === 0}
-    <div class="empty-state">
-      <h3>No Instances Found</h3>
-      <p>Create or import a Minecraft instance to get started.</p>
-      <button class="btn btn-primary" style="margin-top: var(--spacing-md)" on:click={() => showModal = true}>Create New Instance</button>
-    </div>
+    <EmptyState
+      icon="instances"
+      title="No instances yet"
+      description="Create your first Minecraft instance to get started."
+      actionLabel="+ Create Instance"
+      on:action={() => (showModal = true)}
+    />
   {:else}
     <div class="grid">
       {#each instances as instance}
@@ -69,7 +83,7 @@
           </div>
           <div class="card-actions">
             <button class="btn btn-primary">Play</button>
-            <button class="btn btn-secondary">Details</button>
+            <button class="btn btn-secondary" on:click={() => dispatch('navigate', `instance-details:${instance.id}`)}>Settings</button>
           </div>
         </div>
       {/each}
@@ -77,16 +91,22 @@
   {/if}
 
   {#if showModal}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="modal-backdrop" on:click={() => showModal = false}>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div class="modal" on:click|stopPropagation>
         <h2>Create Instance</h2>
         
         <div class="form-group">
+          <!-- svelte-ignore a11y-label-has-associated-control -->
           <label>Instance Name</label>
           <input type="text" bind:value={newInstance.name} placeholder="e.g. My Survival World" />
         </div>
 
         <div class="form-group">
+          <!-- svelte-ignore a11y-label-has-associated-control -->
           <label>Version</label>
           <Dropdown 
             options={availableVersions.map(v => ({ label: v, value: v }))} 
@@ -96,12 +116,10 @@
         </div>
 
         <div class="form-group">
+          <!-- svelte-ignore a11y-label-has-associated-control -->
           <label>Mod Loader</label>
           <Dropdown 
-            options={[
-              { label: 'Vanilla', value: 'Vanilla' },
-              { label: 'Fabric (Coming Soon)', value: 'Fabric', disabled: true }
-            ]} 
+            options={availableLoaders} 
             bind:value={newInstance.loader} 
             direction="up"
           />
@@ -154,7 +172,7 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
     gap: var(--spacing-lg);
   }
 
@@ -177,7 +195,7 @@
 
   .instance-meta {
     font-size: 14px;
-    color: var(--text-secondary);
+    color: var(--text-meta);
   }
 
   .instance-last-played {

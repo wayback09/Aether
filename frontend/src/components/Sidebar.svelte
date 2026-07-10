@@ -3,22 +3,23 @@
   import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
   import { GetExtensionSidebarPages } from '../../wailsjs/go/main/App';
   import AccountManager from './AccountManager.svelte';
-  
+  import Icon from './Icon.svelte';
+
   export let activePage: string = 'home';
-  
+
   const dispatch = createEventDispatcher();
-  
+
   const topNav = [
-    { id: 'home', label: 'Home' },
-    { id: 'instances', label: 'Instances' },
-    { id: 'extensions', label: 'Extensions' }
-  ];
-  
-  const bottomNav = [
-    { id: 'settings', label: 'Settings' }
+    { id: 'home',       label: 'Home',       icon: 'home'       },
+    { id: 'instances',  label: 'Instances',  icon: 'instances'  },
+    { id: 'extensions', label: 'Extensions', icon: 'extensions' },
   ];
 
-  let extensionTabs: Array<{ id: string, label: string, url: string }> = [];
+  const bottomNav = [
+    { id: 'settings', label: 'Settings', icon: 'settings' },
+  ];
+
+  let extensionTabs: Array<{ id: string; label: string; url: string; icon?: string }> = [];
 
   onMount(async () => {
     // 1. Fetch any tabs that were registered before the frontend loaded
@@ -26,19 +27,19 @@
       const cachedTabs = await GetExtensionSidebarPages();
       if (cachedTabs) {
         for (const tab of cachedTabs) {
-          if (!extensionTabs.find(t => t.id === tab.id)) {
+          if (!extensionTabs.find((t) => t.id === tab.id)) {
             extensionTabs = [...extensionTabs, tab];
             dispatch('registerExtensionRoute', tab);
           }
         }
       }
     } catch (e) {
-      console.error("Failed to load cached extension tabs", e);
+      console.error('Failed to load cached extension tabs', e);
     }
 
     // 2. Listen for any tabs registered dynamically while running
     EventsOn('extension:sidebar:add', (payload: any) => {
-      if (!extensionTabs.find(t => t.id === payload.id)) {
+      if (!extensionTabs.find((t) => t.id === payload.id)) {
         extensionTabs = [...extensionTabs, payload];
         dispatch('registerExtensionRoute', payload);
       }
@@ -52,18 +53,30 @@
   function navigate(pageId: string) {
     dispatch('navigate', pageId);
   }
+
+  /** Returns the first letter of a label, uppercased — used as icon fallback */
+  function monogram(label: string): string {
+    return label.charAt(0).toUpperCase();
+  }
 </script>
 
 <aside class="sidebar">
-  <div class="logo">Aether</div>
-  
+  <div class="logo">
+    <img src="/logo.png" alt="Logo" class="sidebar-logo" />
+    Aether
+  </div>
+
   <nav class="top-nav">
     {#each topNav as item}
-      <button 
-        class="nav-item {activePage === item.id ? 'active' : ''}" 
+      <button
+        class="nav-item {activePage === item.id ? 'active' : ''}"
         on:click={() => navigate(item.id)}
+        title={item.label}
       >
-        {item.label}
+        <span class="nav-icon">
+          <Icon name={item.icon} size={16} />
+        </span>
+        <span class="nav-label">{item.label}</span>
       </button>
     {/each}
 
@@ -71,23 +84,37 @@
       <div class="nav-divider"></div>
       <div class="nav-section-title">Extensions</div>
       {#each extensionTabs as tab}
-        <button 
-          class="nav-item extension {activePage === tab.id ? 'active' : ''}" 
+        <button
+          class="nav-item extension {activePage === tab.id ? 'active' : ''}"
           on:click={() => navigate(tab.id)}
+          title={tab.label}
         >
-          {tab.label}
+          <span class="nav-icon ext-icon-wrap">
+            {#if tab.icon}
+              <!-- Extension-supplied icon name -->
+              <Icon name={tab.icon} size={14} />
+            {:else}
+              <!-- Monogram fallback -->
+              <span class="monogram">{monogram(tab.label)}</span>
+            {/if}
+          </span>
+          <span class="nav-label">{tab.label}</span>
         </button>
       {/each}
     {/if}
   </nav>
-  
+
   <nav class="bottom-nav">
     {#each bottomNav as item}
-      <button 
-        class="nav-item {activePage === item.id ? 'active' : ''}" 
+      <button
+        class="nav-item {activePage === item.id ? 'active' : ''}"
         on:click={() => navigate(item.id)}
+        title={item.label}
       >
-        {item.label}
+        <span class="nav-icon">
+          <Icon name={item.icon} size={16} />
+        </span>
+        <span class="nav-label">{item.label}</span>
       </button>
     {/each}
   </nav>
@@ -97,43 +124,56 @@
 
 <style>
   .sidebar {
-    width: 240px;
-    min-width: 240px;
+    width: 220px;
+    min-width: 220px;
     background-color: var(--sidebar-bg);
     display: flex;
     flex-direction: column;
-    padding: 24px 16px;
+    padding: 24px 12px;
     box-sizing: border-box;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .logo {
-    font-size: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
     font-weight: 700;
-    margin-bottom: 40px;
-    padding: 0 16px;
+    margin-bottom: 36px;
+    padding: 0 12px;
     letter-spacing: -0.5px;
+  }
+
+  .sidebar-logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
   }
 
   .top-nav {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .bottom-nav {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     margin-top: auto;
   }
 
+  /* Nav item — icon + label layout */
   .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     background: transparent;
     border: none;
     text-align: left;
-    padding: 10px 16px;
+    padding: 9px 12px;
     border-radius: var(--border-radius);
     color: var(--text-secondary);
     font-family: inherit;
@@ -141,6 +181,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: background-color var(--transition-fast), color var(--transition-fast);
+    width: 100%;
   }
 
   .nav-item:hover {
@@ -154,10 +195,39 @@
     font-weight: 600;
   }
 
+  /* Icon cell */
+  .nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  /* Monogram fallback for extension tabs */
+  .ext-icon-wrap {
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .monogram {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .nav-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .nav-divider {
     height: 1px;
     background: rgba(255, 255, 255, 0.05);
-    margin: 8px 16px;
+    margin: 8px 12px;
   }
 
   .nav-section-title {
@@ -165,8 +235,8 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-secondary);
-    padding: 4px 16px;
+    padding: 4px 12px;
     font-weight: 600;
-    margin-top: 4px;
+    margin-top: 2px;
   }
 </style>

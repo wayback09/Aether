@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 
 	"Aether/pkg/fs"
+	"Aether/pkg/instance"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Manager handles the lifecycle of all extensions
@@ -17,6 +21,16 @@ type Manager struct {
 	LoadedExtensions map[string]Extension
 	sandboxes        map[string]*Sandbox
 	SidebarPages     []map[string]interface{}
+	ModLoaders       map[string]ModLoaderConfig
+}
+
+// ModLoaderConfig holds info about a registered mod loader
+type ModLoaderConfig struct {
+	ID          string
+	Name        string
+	Description string
+	ExtensionID string
+	Callback    func(ctx map[string]interface{}) (map[string]interface{}, error)
 }
 
 // GlobalManager holds the singleton instance for UI access
@@ -29,6 +43,7 @@ func NewManager(ctx context.Context) *Manager {
 		LoadedExtensions: make(map[string]Extension),
 		sandboxes:        make(map[string]*Sandbox),
 		SidebarPages:     make([]map[string]interface{}, 0),
+		ModLoaders:       make(map[string]ModLoaderConfig),
 	}
 }
 
@@ -64,6 +79,20 @@ func (m *Manager) LoadAll() error {
 				manifest.ID = entry.Name()
 			}
 
+			// Determine trust level: Check against gallery API mock
+			trust := "local"
+			for _, ge := range GetGalleryExtensions() {
+				if ge.ID == manifest.ID {
+					trust = ge.Trust
+					break
+				}
+			}
+
+			iconUrl := ""
+			if manifest.Icon != "" {
+				iconUrl = fmt.Sprintf("%s/%s/%s", m.serverURL, manifest.ID, manifest.Icon)
+			}
+
 			ext := Extension{
 				ID:      manifest.ID,
 				Name:    manifest.Name,
@@ -72,11 +101,54 @@ func (m *Manager) LoadAll() error {
 				Status:  "Running",
 				Memory:  "0MB",
 				CPU:     "0%",
+				Trust:   trust,
+				IconURL: iconUrl,
 			}
 
-			sandbox := NewSandbox(m.ctx, manifest, m.serverURL, func(payload map[string]interface{}) {
-				m.SidebarPages = append(m.SidebarPages, payload)
-			})
+			sandbox := NewSandbox(
+				m.ctx, manifest, m.serverURL,
+				func(payload map[string]interface{}) {
+					m.SidebarPages = append(m.SidebarPages, payload)
+				},
+				func(config ModLoaderConfig) {
+					m.ModLoaders[config.ID] = config
+				},
+				func() []InstanceInfo {
+					all := instance.GetInstances()
+					var out []InstanceInfo
+					for _, inst := range all {
+						out = append(out, InstanceInfo{
+							ID:      inst.ID,
+							Name:    inst.Name,
+							Version: inst.Version,
+							Loader:  inst.Loader,
+						})
+					}
+					return out
+				},
+				func(instanceID, jarName, downloadURL string) (string, error) {
+					jarName = filepath.Base(jarName)
+					modsDir := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods")
+					if err := os.MkdirAll(modsDir, 0755); err != nil {
+						return "", err
+					}
+					destPath := filepath.Join(modsDir, jarName)
+					resp, err := http.Get(downloadURL)
+					if err != nil {
+						return "", err
+					}
+					defer resp.Body.Close()
+					out, err := os.Create(destPath)
+					if err != nil {
+						return "", err
+					}
+					defer out.Close()
+					if _, err = io.Copy(out, resp.Body); err != nil {
+						return "", err
+					}
+					return destPath, nil
+				},
+			)
 			m.sandboxes[manifest.ID] = sandbox
 
 			if manifest.Main != "" {
@@ -108,6 +180,26 @@ func (m *Manager) GetExtensions() []Extension {
 		list = append(list, ext)
 	}
 	return list
+}
+
+// HandleIPCMessage routes a message from the UI iframe to the extension sandbox
+func (m *Manager) HandleIPCMessage(extID string, payload map[string]interface{}) {
+	sandbox, ok := m.sandboxes[extID]
+	if !ok {
+		fmt.Printf("[Manager] IPC message for unknown extension: %s\n", extID)
+		return
+	}
+
+	// If the sandbox has a registered listener, call it
+	if sandbox.onMessageCallback != nil {
+		result, err := sandbox.onMessageCallback(payload)
+		if err != nil {
+			fmt.Printf("[Manager] IPC callback error for %s: %v\n", extID, err)
+			return
+		}
+		// Emit the response back to the frontend as a Wails event
+		runtime.EventsEmit(m.ctx, "extension:message:"+extID, result)
+	}
 }
 
 // GetSidebarPages returns all registered sidebar pages

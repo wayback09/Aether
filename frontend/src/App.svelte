@@ -1,45 +1,113 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
   import TitleBar from './components/TitleBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
+  import CommandPalette from './components/CommandPalette.svelte';
   import Home from './pages/Home.svelte';
   import Instances from './pages/Instances.svelte';
   import Extensions from './pages/Extensions.svelte';
   import ExtensionView from './pages/ExtensionView.svelte';
+  import InstanceDetails from './pages/InstanceDetails.svelte';
 
   let activePage = 'home';
+  let targetInstanceId = '';
+  let activeInstanceId = '';
   let extensionRoutes: Record<string, string> = {};
+  let paletteOpen = false;
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
+
+  function navigate(page: string) {
+    activePage = page;
+  }
 
   function handleNavigate(event: CustomEvent<string>) {
-    activePage = event.detail;
+    const payload = event.detail;
+    if (payload.startsWith('instance-details:')) {
+      targetInstanceId = payload.split(':')[1];
+      navigate('instance-details');
+    } else if (payload.startsWith('home:instance:')) {
+      // Navigate home and pre-select the given instance ID
+      activeInstanceId = payload.split(':')[2];
+      navigate('home');
+    } else {
+      navigate(payload);
+    }
   }
 
-  function handleRegisterExtensionRoute(event: CustomEvent<{id: string, url: string}>) {
+  function handleRegisterExtensionRoute(event: CustomEvent<{ id: string; url: string }>) {
     extensionRoutes[event.detail.id] = event.detail.url;
   }
+
+  // ── Command Palette ──────────────────────────────────────────────────────────
+
+  /** Core commands — every extension can push more in later */
+  const commands = [
+    { id: 'go-home',       label: 'Go to Home',        category: 'Navigation', action: () => navigate('home')       },
+    { id: 'go-instances',  label: 'Go to Instances',   category: 'Navigation', action: () => navigate('instances')  },
+    { id: 'go-extensions', label: 'Go to Extensions',  category: 'Navigation', action: () => navigate('extensions') },
+    { id: 'go-settings',   label: 'Go to Settings',    category: 'Navigation', action: () => navigate('settings')   },
+    { id: 'open-gallery',  label: 'Open Gallery',       category: 'Extensions', action: () => navigate('extensions') },
+    {
+      id: 'create-instance',
+      label: 'Create Instance',
+      category: 'Instances',
+      action: () => {
+        navigate('instances');
+        // Slight delay so the page mounts before opening the modal
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('aether:open-create-instance'));
+        }, 80);
+      },
+    },
+  ];
+
+  function openPalette() {
+    paletteOpen = true;
+  }
+
+  function onGlobalKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+      e.preventDefault();
+      openPalette();
+    }
+  }
+
+  onMount(() => window.addEventListener('keydown', onGlobalKeydown));
+  onDestroy(() => window.removeEventListener('keydown', onGlobalKeydown));
 </script>
 
 <div class="app-container">
   <TitleBar />
   <div class="layout">
-    <Sidebar {activePage} on:navigate={handleNavigate} on:registerExtensionRoute={handleRegisterExtensionRoute} />
+    <Sidebar
+      {activePage}
+      on:navigate={handleNavigate}
+      on:registerExtensionRoute={handleRegisterExtensionRoute}
+    />
 
-  <main class="content">
-    {#if activePage === 'home'}
-      <Home />
-    {:else if activePage === 'instances'}
-      <Instances />
-    {:else if activePage === 'extensions'}
-      <Extensions />
-    {:else if extensionRoutes[activePage]}
-      <ExtensionView url={extensionRoutes[activePage]} />
-    {:else}
-      <div class="placeholder">
-        <h2>{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</h2>
-        <p>This page is under construction.</p>
-      </div>
-    {/if}
-  </main>
+    <main class="content">
+      {#if activePage === 'home'}
+        <Home on:navigate={handleNavigate} activeInstanceId={activeInstanceId} />
+      {:else if activePage === 'instances'}
+        <Instances on:navigate={handleNavigate} />
+      {:else if activePage === 'instance-details'}
+        <InstanceDetails instanceId={targetInstanceId} on:navigate={handleNavigate} />
+      {:else if activePage === 'extensions'}
+        <Extensions />
+      {:else if extensionRoutes[activePage]}
+        <ExtensionView url={extensionRoutes[activePage]} extID={activePage} />
+      {:else}
+        <div class="placeholder">
+          <h2>{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</h2>
+          <p>This page is under construction.</p>
+        </div>
+      {/if}
+    </main>
   </div>
+
+  <!-- Command Palette — rendered above everything -->
+  <CommandPalette bind:open={paletteOpen} {commands} on:close={() => (paletteOpen = false)} />
 </div>
 
 <style>
@@ -77,7 +145,7 @@
     height: 100%;
     color: var(--text-secondary);
   }
-  
+
   .placeholder h2 {
     color: var(--text-primary);
     margin-bottom: var(--spacing-sm);

@@ -7,9 +7,11 @@ type Manifest struct {
 	Version     string   `json:"version"`
 	Author      string   `json:"author"`
 	Description string   `json:"description"`
+	Icon        string   `json:"icon,omitempty"`
 	Main        string   `json:"main"`
 	API         string   `json:"api"`
 	Permissions []string `json:"permissions"`
+	Hosts       []string `json:"hosts,omitempty"`
 }
 
 // HasPermission checks if the extension has requested a specific capability

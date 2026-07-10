@@ -10,7 +10,7 @@ import (
 	"Aether/pkg/fs"
 )
 
-// AccountType defines the type of account (e.g., offline, microsoft)
+// AccountType defines the type of account
 type AccountType string
 
 const (
@@ -20,9 +20,11 @@ const (
 
 // Account represents a user profile
 type Account struct {
-	ID       string      `json:"id"`
-	Type     AccountType `json:"type"`
-	Username string      `json:"username"`
+	ID           string      `json:"id"`
+	Type         AccountType `json:"type"`
+	Username     string      `json:"username"`
+	AccessToken  string      `json:"accessToken,omitempty"`
+	RefreshToken string      `json:"refreshToken,omitempty"`
 }
 
 // AccountStore represents the accounts.json file structure
@@ -43,23 +45,18 @@ func LoadAccounts() error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Initialize empty store
 			store = AccountStore{Accounts: []Account{}}
 			return nil
 		}
 		return err
 	}
-
 	return json.Unmarshal(data, &store)
 }
 
 // SaveAccounts writes the in-memory store to accounts.json
 func SaveAccounts() error {
 	path := getStorePath()
-	
-	// Ensure directory exists (though fs.GetDataDir() should handle base dir)
 	os.MkdirAll(filepath.Dir(path), 0755)
-
 	data, err := json.MarshalIndent(store, "", "  ")
 	if err != nil {
 		return err
@@ -67,10 +64,9 @@ func SaveAccounts() error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// GenerateOfflineUUID generates a deterministic UUID for offline/cracked mode based on username
+// GenerateOfflineUUID generates a deterministic UUID for offline mode based on username
 func GenerateOfflineUUID(username string) string {
 	hash := md5.Sum([]byte("OfflinePlayer:" + username))
-	// Set version 3 and variant bits
 	hash[6] = (hash[6] & 0x0f) | 0x30
 	hash[8] = (hash[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
@@ -83,8 +79,7 @@ func AddOfflineAccount(username string) (Account, error) {
 	}
 
 	id := GenerateOfflineUUID(username)
-	
-	// Check if account already exists
+
 	for _, acc := range store.Accounts {
 		if acc.ID == id {
 			store.ActiveAccountID = id
@@ -105,15 +100,59 @@ func AddOfflineAccount(username string) (Account, error) {
 	return newAcc, err
 }
 
+// AddMicrosoftAccount saves a Microsoft account and sets it as active
+func AddMicrosoftAccount(acc Account) error {
+	if err := LoadAccounts(); err != nil {
+		return err
+	}
+
+	// Replace if exists
+	for i, existing := range store.Accounts {
+		if existing.ID == acc.ID {
+			store.Accounts[i] = acc
+			store.ActiveAccountID = acc.ID
+			return SaveAccounts()
+		}
+	}
+
+	store.Accounts = append(store.Accounts, acc)
+	store.ActiveAccountID = acc.ID
+	return SaveAccounts()
+}
+
+// RemoveAccount removes an account by ID
+func RemoveAccount(id string) error {
+	if err := LoadAccounts(); err != nil {
+		return err
+	}
+
+	filtered := store.Accounts[:0]
+	for _, acc := range store.Accounts {
+		if acc.ID != id {
+			filtered = append(filtered, acc)
+		}
+	}
+	store.Accounts = filtered
+
+	if store.ActiveAccountID == id {
+		if len(store.Accounts) > 0 {
+			store.ActiveAccountID = store.Accounts[0].ID
+		} else {
+			store.ActiveAccountID = ""
+		}
+	}
+
+	return SaveAccounts()
+}
+
 // GetActiveAccount returns the currently active account, or nil if none
 func GetActiveAccount() *Account {
 	if err := LoadAccounts(); err != nil {
 		return nil
 	}
-
-	for _, acc := range store.Accounts {
+	for i, acc := range store.Accounts {
 		if acc.ID == store.ActiveAccountID {
-			return &acc
+			return &store.Accounts[i]
 		}
 	}
 	return nil
@@ -132,7 +171,6 @@ func SetActiveAccount(id string) error {
 	if err := LoadAccounts(); err != nil {
 		return err
 	}
-	
 	for _, acc := range store.Accounts {
 		if acc.ID == id {
 			store.ActiveAccountID = id

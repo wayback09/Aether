@@ -59,3 +59,19 @@ func GetActiveInstance() *Instance {
 	}
 	return nil
 }
+
+// UpdateInstance saves the modified instance data to disk
+func UpdateInstance(inst *Instance) error {
+	manifestPath := filepath.Join(fs.GetDataDir(), "instances", inst.ID, "instance.json")
+	data, err := json.MarshalIndent(inst, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(manifestPath, data, 0644)
+}
+
+// DeleteInstance permanently removes an instance directory from disk
+func DeleteInstance(id string) error {
+	instanceDir := filepath.Join(fs.GetDataDir(), "instances", id)
+	return os.RemoveAll(instanceDir)
+}

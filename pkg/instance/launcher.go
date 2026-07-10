@@ -23,11 +23,32 @@ func Launch(ctx context.Context, inst *Instance) error {
 	instanceDir := filepath.Join(fs.GetDataDir(), "instances", inst.ID)
 	assetsDir := fs.GetAssetsDir()
 
-	// 1. Find Java
-	javaPath, err := java.FindJava()
-	if err != nil {
-		return fmt.Errorf("java not found: %w", err)
+	// 1. Determine the required Java version for this Minecraft version
+	requiredJava := java.RequiredJavaVersion(inst.Version)
+	fmt.Printf("[Launcher] Minecraft %s requires Java >= %d\n", inst.Version, requiredJava)
+
+	var javaPath string
+
+	// 2a. Fast path: use already-managed JRE if present
+	if java.IsManagedJavaInstalled(requiredJava) {
+		javaPath = java.GetManagedJavaPath(requiredJava)
+		fmt.Printf("[Launcher] Using managed JRE: %s\n", javaPath)
+	} else {
+		// 2b. Try to find a compatible system Java
+		systemJava, err := java.FindJava(requiredJava)
+		if err == nil {
+			javaPath = systemJava
+			fmt.Printf("[Launcher] Using system Java: %s\n", javaPath)
+		} else {
+			// 2c. Download a managed JRE from Adoptium
+			fmt.Printf("[Launcher] No compatible Java found, downloading Java %d...\n", requiredJava)
+			if dlErr := java.DownloadJava(ctx, requiredJava); dlErr != nil {
+				return fmt.Errorf("failed to download Java %d: %w", requiredJava, dlErr)
+			}
+			javaPath = java.GetManagedJavaPath(requiredJava)
+		}
 	}
+
 	fmt.Printf("[Launcher] Using Java: %s\n", javaPath)
 
 	// 2. Load saved version.json
@@ -52,10 +73,16 @@ func Launch(ctx context.Context, inst *Instance) error {
 	activeAccount := auth.GetActiveAccount()
 	username := "Player"
 	uuid := auth.GenerateOfflineUUID(username)
+	accessToken := "0"
+	userType := "legacy"
 	
 	if activeAccount != nil {
 		username = activeAccount.Username
 		uuid = activeAccount.ID
+		if activeAccount.Type == auth.TypeMicrosoft {
+			accessToken = activeAccount.AccessToken
+			userType = "msa"
+		}
 	}
 
 	vars := map[string]string{
@@ -65,16 +92,51 @@ func Launch(ctx context.Context, inst *Instance) error {
 		"${assets_root}":      assetsDir,
 		"${assets_index_name}": versionInfo.Assets,
 		"${auth_uuid}":        uuid,
-		"${auth_access_token}": "0",
+		"${auth_access_token}": accessToken,
 		"${clientid}":         "0",
 		"${auth_xuid}":        "0",
-		"${user_type}":        "legacy",
+		"${user_type}":        userType,
 		"${version_type}":     versionInfo.Type,
 		"${natives_directory}": nativesDir,
 		"${launcher_name}":    "Aether",
 		"${launcher_version}": "1.0",
 		"${classpath}":        classpath,
 		"${path}":             filepath.Join(instanceDir, versionInfo.Logging.Client.File.ID),
+	}
+
+	// 5b. Mod Loader Interception
+	mainClass := versionInfo.MainClass
+	cpArray := strings.Split(classpath, string(os.PathListSeparator))
+
+	if inst.Loader != "" && inst.Loader != "Vanilla" && ModLoaderHook != nil {
+		fmt.Printf("[Launcher] Intercepting launch with mod loader: %s\n", inst.Loader)
+
+		hookCtx := map[string]interface{}{
+			"instancePath": instanceDir,
+			"mcVersion":    inst.Version,
+			"classpath":    cpArray,
+			"mainClass":    mainClass,
+		}
+
+		modified, err := ModLoaderHook(strings.ToLower(inst.Loader), hookCtx)
+		if err != nil {
+			return fmt.Errorf("mod loader failed: %w", err)
+		}
+
+		// Extract modified values
+		if mc, ok := modified["mainClass"].(string); ok {
+			mainClass = mc
+		}
+
+		if cpIface, ok := modified["classpath"].([]interface{}); ok {
+			cpArray = make([]string, len(cpIface))
+			for i, v := range cpIface {
+				cpArray[i] = fmt.Sprint(v)
+			}
+		}
+
+		// Rebuild classpath variable for substitution
+		vars["${classpath}"] = strings.Join(cpArray, string(os.PathListSeparator))
 	}
 
 	// 6. Resolve JVM arguments from version JSON
@@ -102,7 +164,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 	gameArgs = substituteVars(gameArgs, vars)
 
 	// 8. Construct full command: java [jvm args] mainClass [game args]
-	args := append(jvmArgs, versionInfo.MainClass)
+	args := append(jvmArgs, mainClass)
 	args = append(args, gameArgs...)
 
 	fmt.Printf("[Launcher] Command: %s %s\n", javaPath, strings.Join(args, " "))
@@ -124,7 +186,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 		return fmt.Errorf("failed to start Minecraft: %w", err)
 	}
 
-	// Notify frontend that we are running
+	// Notify frontend that the instance is running
 	runtime.EventsEmit(ctx, "instance:state", map[string]interface{}{
 		"id":    inst.ID,
 		"state": "Running",

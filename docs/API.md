@@ -41,7 +41,7 @@ Allows the extension to programmatically modify instance JSON files. This is pri
 By default, the backend Sandbox cannot access the network. To make HTTP requests, you must request `network:fetch` in your permissions and use the provided `Aether.network.fetch()` API (planned).
 Direct browser `fetch()` is intentionally omitted from the backend sandbox to ensure all requests pass through Aether's domain whitelisting, logging, and rate-limiting systems.
 
-*Note: Your frontend UI (running in the iframe) CAN use the browser's native `fetch()` because it operates under standard web security models, but this may be restricted in the future for security reasons.*
+*Note: Your frontend UI (running in the iframe) CAN use Aether's provided native `fetch()` because it operates under standard web security models, but this may be restricted in the future for security reasons.*
 
 ## Communication with the Frontend (Iframe)
 Your frontend UI runs in an `<iframe>` served by a local HTTP server. Because it's isolated, it cannot call the `Aether` Go API directly.

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -30,7 +31,7 @@ func NewDownloadEngine(ctx context.Context, instanceID, basePath string) *Downlo
 
 // Install processes the VersionInfo and downloads everything needed to launch
 func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
-	// Count only the libraries we'll actually download + client jar
+	// Count only the libraries to download + client jar
 	allowedLibs := []Library{}
 	for _, lib := range info.Libraries {
 		if lib.Downloads.Artifact.URL != "" && IsLibraryAllowed(lib) {
@@ -156,27 +157,55 @@ func (e *DownloadEngine) downloadFile(url string, dest string) error {
 		return err
 	}
 
-	// Skip if file already exists (simplistic check for this phase)
+	// Skip if final file already exists
 	if _, err := os.Stat(dest); err == nil {
 		return nil
 	}
 
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	tempDest := dest + ".tmp"
+	maxRetries := 3
+	var lastErr error
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download: status %d", resp.StatusCode)
+	for i := 0; i < maxRetries; i++ {
+		err := func() error {
+			resp, err := http.Get(url)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("failed to download: status %d", resp.StatusCode)
+			}
+
+			out, err := os.Create(tempDest)
+			if err != nil {
+				return err
+			}
+			defer out.Close()
+
+			if _, err = io.Copy(out, resp.Body); err != nil {
+				return err
+			}
+			return nil
+		}()
+
+		if err == nil {
+			// Successfully downloaded to temp file, rename it to the final destination atomically
+			// We remove the old temp file if it's there, but os.Rename overwrites in windows mostly,
+			// though it's safer to ensure the tempDest is flushed and closed, which it is due to defer inside the func above.
+			if err := os.Rename(tempDest, dest); err != nil {
+				// Fallback if Rename fails across drives, though usually not an issue here since it's the same dir
+				return fmt.Errorf("failed to rename temp file: %w", err)
+			}
+			return nil
+		}
+
+		lastErr = err
+		// Clean up the partial temp file before retrying
+		os.Remove(tempDest)
+		time.Sleep(1 * time.Second)
 	}
 
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	return err
+	return fmt.Errorf("failed to download after %d retries, last error: %w", maxRetries, lastErr)
 }

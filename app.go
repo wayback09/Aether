@@ -11,10 +11,10 @@ import (
 	"Aether/pkg/extensions"
 	"Aether/pkg/fs"
 	"Aether/pkg/instance"
+	"Aether/pkg/java"
 	"Aether/pkg/mojang"
 )
 
-// App struct
 type App struct {
 	ctx context.Context
 }
@@ -25,7 +25,7 @@ func NewApp() *App {
 }
 
 // startup is called when the app starts. The context is saved
-// so we can call the runtime methods
+// to call runtime methods.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	fs.EnsureDirectories()
@@ -33,6 +33,15 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize and load all extensions into their isolates
 	extensions.GlobalManager = extensions.NewManager(ctx)
 	extensions.GlobalManager.LoadAll()
+
+	// Wire the mod loader hook so launcher.go can call extension mod loaders
+	// without an import cycle (instance → extensions → instance)
+	instance.ModLoaderHook = func(loaderID string, hookCtx map[string]interface{}) (map[string]interface{}, error) {
+		if loader, ok := extensions.GlobalManager.ModLoaders[loaderID]; ok {
+			return loader.Callback(hookCtx)
+		}
+		return nil, fmt.Errorf("mod loader '%s' is not installed", loaderID)
+	}
 }
 
 // GetInstances returns all installed instances
@@ -45,17 +54,76 @@ func (a *App) GetActiveInstance() *instance.Instance {
 	return instance.GetActiveInstance()
 }
 
-// --- Extension Methods ---
-
 func (a *App) GetExtensions() []extensions.Extension {
 	return extensions.GetExtensions()
 }
 
+// GetExtensionSidebarPages returns sidebar pages contributed by extensions
 func (a *App) GetExtensionSidebarPages() []map[string]interface{} {
 	if extensions.GlobalManager != nil {
 		return extensions.GlobalManager.GetSidebarPages()
 	}
 	return []map[string]interface{}{}
+}
+
+// SendExtensionMessage routes an IPC message from the UI iframe to the extension sandbox
+func (a *App) SendExtensionMessage(extID string, payload map[string]interface{}) {
+	if extensions.GlobalManager != nil {
+		extensions.GlobalManager.HandleIPCMessage(extID, payload)
+	}
+}
+
+// ModLoaderInfo represents a registered mod loader
+type ModLoaderInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// GetModLoaders returns all mod loaders registered by extensions
+func (a *App) GetModLoaders() []ModLoaderInfo {
+	var loaders []ModLoaderInfo
+	if extensions.GlobalManager != nil {
+		for _, loader := range extensions.GlobalManager.ModLoaders {
+			loaders = append(loaders, ModLoaderInfo{
+				ID:          loader.ID,
+				Name:        loader.Name,
+				Description: loader.Description,
+			})
+		}
+	}
+	return loaders
+}
+
+// JavaRuntimeStatus describes the status of a managed Java runtime.
+type JavaRuntimeStatus struct {
+	Version   int    `json:"version"`
+	Installed bool   `json:"installed"`
+	Path      string `json:"path"`
+}
+
+// GetJavaStatus returns the installation status for each required Java version.
+func (a *App) GetJavaStatus() []JavaRuntimeStatus {
+	versions := []int{8, 17, 21}
+	var statuses []JavaRuntimeStatus
+	for _, v := range versions {
+		installed := java.IsManagedJavaInstalled(v)
+		path := ""
+		if installed {
+			path = java.GetManagedJavaPath(v)
+		}
+		statuses = append(statuses, JavaRuntimeStatus{
+			Version:   v,
+			Installed: installed,
+			Path:      path,
+		})
+	}
+	return statuses
+}
+
+// DownloadJavaRuntime downloads a managed JRE for the given major version.
+func (a *App) DownloadJavaRuntime(version int) error {
+	return java.DownloadJava(a.ctx, version)
 }
 
 func (a *App) SelectAndInstallExtension() (bool, error) {
@@ -89,9 +157,6 @@ func (a *App) SelectAndInstallExtension() (bool, error) {
 }
 
 
-// --- Auth Methods ---
-
-// GetActiveAccount returns the currently active account
 func (a *App) GetActiveAccount() *auth.Account {
 	return auth.GetActiveAccount()
 }
@@ -109,6 +174,48 @@ func (a *App) LoginOffline(username string) (auth.Account, error) {
 // SetActiveAccount sets the active account by ID
 func (a *App) SetActiveAccount(id string) error {
 	return auth.SetActiveAccount(id)
+}
+
+// RemoveAccount removes an account by ID
+func (a *App) RemoveAccount(id string) error {
+	return auth.RemoveAccount(id)
+}
+
+// LoginWithMicrosoft starts the OAuth2 flow and returns immediately.
+func (a *App) LoginWithMicrosoft() error {
+	go func() {
+		var browserPort int
+		
+		// 1. Start local server. This will block until completion,
+		// but it calls our onStart callback as soon as it's listening.
+		code, err := auth.StartCallbackServer(func(port int) {
+			browserPort = port
+			url := auth.GetMicrosoftAuthURL(port)
+			runtime.BrowserOpenURL(a.ctx, url)
+		})
+		
+		if err != nil {
+			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
+			return
+		}
+
+		// 2. Exchange code for full token chain
+		acc, err := auth.LoginWithMicrosoft(code, browserPort)
+		if err != nil {
+			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
+			return
+		}
+
+		// 3. Save and set as active
+		if err := auth.AddMicrosoftAccount(acc); err != nil {
+			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
+			return
+		}
+
+		// 4. Tell frontend we're done
+		runtime.EventsEmit(a.ctx, "auth:complete")
+	}()
+	return nil
 }
 
 // LaunchInstance starts the specified instance
@@ -184,8 +291,21 @@ func (a *App) GetAvailableVersions() ([]string, error) {
 	return releases, nil
 }
 
-// CreateInstance creates a new instance on disk
-func (a *App) CreateInstance(name, version, loader string) error {
-	_, err := instance.Create(name, version, loader)
-	return err
+// CreateInstance creates a new instance on disk and returns the created instance
+func (a *App) CreateInstance(name, version, loader string) (*instance.Instance, error) {
+	inst, err := instance.Create(name, version, loader)
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// UpdateInstance saves changes to an instance
+func (a *App) UpdateInstance(inst *instance.Instance) error {
+	return instance.UpdateInstance(inst)
+}
+
+// DeleteInstance deletes an instance completely
+func (a *App) DeleteInstance(id string) error {
+	return instance.DeleteInstance(id)
 }

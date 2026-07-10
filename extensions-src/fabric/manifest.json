@@ -1,0 +1,17 @@
+{
+  "id": "fabric",
+  "name": "Fabric Mod Loader",
+  "version": "1.0.0",
+  "author": "Aether",
+  "description": "Adds support for launching the Fabric mod loader.",
+  "main": "main.js",
+  "permissions": [
+    "launcher:modloader",
+    "network:http",
+    "fs:download"
+  ],
+  "hosts": [
+    "meta.fabricmc.net",
+    "maven.fabricmc.net"
+  ]
+}

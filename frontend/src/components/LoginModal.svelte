@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { LoginOffline } from '../../wailsjs/go/main/App';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import { LoginOffline, LoginWithMicrosoft } from '../../wailsjs/go/main/App';
+  import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
   export let showModal = false;
 
@@ -8,7 +9,38 @@
 
   let username = '';
   let isLoading = false;
+  let isMsLoading = false;
   let errorMsg = '';
+
+  // Listen to backend auth events
+  onMount(() => {
+    EventsOn("auth:complete", () => {
+      isMsLoading = false;
+      showModal = false;
+      dispatch('login_ms');
+    });
+
+    EventsOn("auth:error", (errStr: string) => {
+      isMsLoading = false;
+      errorMsg = errStr;
+    });
+  });
+
+  onDestroy(() => {
+    EventsOff("auth:complete");
+    EventsOff("auth:error");
+  });
+
+  async function handleMicrosoftLogin() {
+    isMsLoading = true;
+    errorMsg = '';
+    try {
+      await LoginWithMicrosoft();
+    } catch (err) {
+      errorMsg = err.toString();
+      isMsLoading = false;
+    }
+  }
 
   async function handleLogin() {
     if (!username.trim()) {
@@ -35,18 +67,32 @@
 {#if showModal}
   <div class="modal-backdrop" on:click={() => showModal = false} on:keydown={(e) => e.key === 'Escape' && (showModal = false)} role="button" tabindex="0">
     <div class="modal" on:click|stopPropagation on:keydown|stopPropagation role="button" tabindex="0">
-      <h2>Offline Login</h2>
-      <p class="subtitle">Enter a username to play offline.</p>
+      <h2>Sign In</h2>
+      <p class="subtitle">Log in to play Minecraft.</p>
       
+      <button class="btn primary btn-microsoft" on:click={handleMicrosoftLogin} disabled={isMsLoading || isLoading}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 21 21">
+          <rect x="1" y="1" width="9" height="9" fill="#f35325"/>
+          <rect x="11" y="1" width="9" height="9" fill="#81bc06"/>
+          <rect x="1" y="11" width="9" height="9" fill="#05a6f0"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffba08"/>
+        </svg>
+        {isMsLoading ? 'Waiting for browser...' : 'Sign in with Microsoft'}
+      </button>
+
+      <div class="divider">
+        <span>or</span>
+      </div>
+
       <div class="form-group">
-        <label for="username">Username</label>
+        <label for="username">Offline Username</label>
         <input 
           id="username"
           type="text" 
           bind:value={username} 
           placeholder="e.g. Notch" 
           on:keydown={(e) => e.key === 'Enter' && handleLogin()}
-          autofocus
+          disabled={isMsLoading || isLoading}
         />
         {#if errorMsg}
           <span class="error">{errorMsg}</span>
@@ -54,9 +100,9 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn secondary" on:click={() => showModal = false}>Cancel</button>
-        <button class="btn primary" on:click={handleLogin} disabled={isLoading}>
-          {isLoading ? 'Logging in...' : 'Login'}
+        <button class="btn secondary" on:click={() => showModal = false} disabled={isMsLoading || isLoading}>Cancel</button>
+        <button class="btn primary" on:click={handleLogin} disabled={isMsLoading || isLoading || !username.trim()}>
+          {isLoading ? 'Logging in...' : 'Offline Login'}
         </button>
       </div>
     </div>
@@ -176,5 +222,43 @@
   .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .btn-microsoft {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: white;
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .btn-microsoft:hover:not(:disabled) {
+    background: #f0f0f0;
+    filter: none;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 24px;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+  
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .divider span {
+    padding: 0 16px;
   }
 </style>
