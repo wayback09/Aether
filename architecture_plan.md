@@ -37,3 +37,76 @@ When extensions register as a provider (e.g., a Mod Loader Installer), they shou
 
 ---
 *Note: These changes are non-urgent. They should be implemented when the extension ecosystem grows large enough to require strict interplay between community extensions.*
+
+## 4. Appearance Packs (UI Extensions)
+A UI Extension customizes how Aether looks and feels. Unlike feature extensions, UI extensions cannot add launcher functionality. Their only purpose is presentation.
+
+**Examples:** Themes, Icon Packs, Layout Variants, Typography Packs, Density Presets, Animation Packs.
+- They never install mods.
+- They never manage instances.
+- They never access launcher data unless explicitly granted.
+
+### Architecture
+```
+Core Launcher
+       ↓
+UI Manager
+       ↓
+Installed UI Extension
+       ↓
+Theme Tokens / Component Overrides / Icons / Animations
+```
+
+### Rules
+**UI Extensions MAY:** Change colors, icons, fonts, spacing, border radius, component density, animation timing, register component styles, register custom illustrations, provide custom empty states.
+
+**UI Extensions MAY NOT:** Replace the sidebar, replace navigation, hide security warnings, inject arbitrary HTML into launcher chrome, override dialogs, move permission prompts, modify another extension, execute privileged API calls.
+
+### Component System & Overrides
+The launcher owns every component (Button, Card, Input, Search, Sidebar, Dialog, Toast, ProgressBar, Checkbox, Select, Badge, Tabs). UI extensions only change how these components look. They never replace them.
+
+**Theme Tokens Example:**
+```json
+{
+  "colors": {
+    "background": "#0B0B0B",
+    "surface": "#141414",
+    "accent": "#3B82F6",
+    "danger": "#DC2626"
+  },
+  "radius": 8,
+  "spacing": "comfortable",
+  "font": "Inter",
+  "density": "normal"
+}
+```
+The launcher maps these tokens to every component. Extensions may optionally override the appearance of individual components (e.g., Button, Card, Sidebar Item), but the launcher still controls behaviour.
+
+### Icon Packs & Assets
+A UI extension may register an icon pack (e.g., Default, Lucide, Minecraft Style, Windows Fluent, Material Symbols). The launcher automatically swaps icons.
+- **Allowed Assets:** SVG, PNG, Fonts, CSS Variables
+- **Not Allowed:** Executable code, Dynamic scripts, External CDN assets
+
+### Settings & Layouts
+Every UI Extension automatically receives its own settings page (Appearance → Theme, Icons, Typography, Density, Advanced). Supported layout presets include Compact, Comfortable, Touch, Wide. The launcher adapts spacing automatically; extensions cannot invent their own layouts.
+
+### Animations
+UI extensions may change: Duration, Easing, Fade, Slide Distance, Scale.
+They may not: Create particle effects, Add unnecessary motion, Reduce accessibility.
+
+### Compatibility & Composability
+UI extensions declare compatibility:
+```json
+{
+    "type": "ui",
+    "supports": {
+        "api": "1.0",
+        "components": "1.0",
+        "theme": "1.0"
+    }
+}
+```
+UI extensions should be composable. Instead of installing one massive theme, users can mix and match UI packs however they like (e.g., Catppuccin theme + Fluent icons + Minimal animations).
+
+### Design Philosophy
+Feature Extensions change **WHAT** Aether can do. UI Extensions change **HOW** Aether feels. Neither should interfere with the other. The launcher always owns the layout, navigation, security, and behaviour.
