@@ -110,3 +110,16 @@ UI extensions should be composable. Instead of installing one massive theme, use
 
 ### Design Philosophy
 Feature Extensions change **WHAT** Aether can do. UI Extensions change **HOW** Aether feels. Neither should interfere with the other. The launcher always owns the layout, navigation, security, and behaviour.
+
+## 5. CI/CD & Automation (GitHub Actions)
+To maintain stability and security across the ecosystem, both the core launcher and the extension registry will rely on GitHub Actions for automated workflows.
+
+### Aether (Core Launcher)
+- **Multi-OS Builds (CD)**: Automated pipelines will run `wails build` across Windows, macOS, and Linux runners whenever a new version tag (e.g., `v1.2.0`) is pushed.
+- **Automated Releases**: Compiled binaries (`.exe`, `.app`, `.AppImage`) will be automatically packaged and attached to GitHub Releases for immediate user download.
+- **Testing (CI)**: Go unit tests and Svelte component tests will run on every Pull Request to prevent regressions in the core API and UI.
+
+### Aether-Extensions (Registry)
+- **Automated Security Audits (CI)**: When a developer submits a PR to add their extension to `index.json`, an Action will download their packaged `.zip`, extract it, and validate the `manifest.json`. It will verify that no hidden or dangerous permissions (e.g., `fs:write` to system directories) are requested.
+- **Community Tier Assignment**: If the automated security and structure checks pass, the workflow will approve the PR and automatically assign the `community` trust badge.
+- **Registry Linter**: A JSON validation step will guarantee `index.json` is perfectly formatted, preventing a missing comma from breaking the in-app gallery for all users.
