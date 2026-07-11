@@ -79,14 +79,20 @@ Because extension UIs run inside an `<iframe>`, you have complete control over y
 However, to maintain a consistent user experience, we recommend matching Aether's dark, frosted-glass aesthetic.
 
 ## Examples
-Check the `examples/` directory in the Aether repository for complete sample extensions, including a basic mod downloader and a custom theme engine.
+Check the `extensions-src/` directory in the Aether repository for complete sample extensions, including the Modrinth Browser and the Fabric mod loader.
 
-## Review Guidelines
-Before an extension can be published to the official Aether registry, it must pass a review:
-1. **No Malicious Code**: Extensions must not steal tokens, install malware, or bypass the sandbox.
-2. **Minimal Performance Impact**: Extensions must not leak memory or block the main thread.
-3. **UI Consistency**: Extensions must use the provided UI components and adhere to the `STYLEGUIDE.md`.
-4. **Clear Purpose**: The extension must do what its description claims.
+## Trust Tiers & Review Guidelines
+When an extension is published to the Aether Registry, it is assigned a trust tier. The launcher displays these badges so users know what they are installing:
+
+1. 🔵 **Official**: Developed and maintained directly by the Aether Team.
+2. 🟢 **Verified**: Personally reviewed by an Aether maintainer. The code has been thoroughly audited for security, performance, and stability.
+3. 🟣 **Community**: Passed automated checks and was merged into the registry via Pull Request, but has not received a manual code audit. Use with caution.
+4. 🟡 **Local**: Installed manually from a `.zip` file. Aether treats these as untrusted.
+
+To get an extension **Verified**, it must pass a manual review:
+1. **No Malicious Code**: Extensions must not steal tokens, install malware, or attempt to break out of the Goja sandbox.
+2. **Performance**: Extensions must not leak memory or block the main thread.
+3. **Clear Purpose**: The extension must do exactly what its description claims.
 
 ## Developer Experience (Planned SDK)
 To simplify extension development in the future, we plan to release a CLI tool (e.g., `aether-cli`) offering commands like:
