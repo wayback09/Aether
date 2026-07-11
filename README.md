@@ -25,6 +25,7 @@ All project documentation is located in the `docs/` directory. If you are lookin
 - **[Architecture](docs/ARCHITECTURE.md)** - Overview of the Go backend, Extension Manager, and launcher pipeline.
 - **[API & Interoperability](docs/API.md)** - Details on the JSON-RPC endpoints and permission model.
 - **[Extensions Guide](docs/EXTENSIONS.md)** - How to build, package, and publish extensions for Aether.
+  - *Looking for the official extension registry? Visit the [Aether-Extensions](https://github.com/wayback09/Aether-Extensions) repository.*
 - **[Security & Sandboxing](docs/SECURITY.md)** - Threat models, capability isolation, and review guidelines.
 - **[UI Specifications](docs/UI.md)** - Layout rules, components, and empty states.
 - **[Styleguide](docs/STYLEGUIDE.md)** - Visual language, typography, colors, and animations.
