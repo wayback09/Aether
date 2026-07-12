@@ -94,10 +94,147 @@ To get an extension **Verified**, it must pass a manual review:
 2. **Performance**: Extensions must not leak memory or block the main thread.
 3. **Clear Purpose**: The extension must do exactly what its description claims.
 
-## Developer Experience (Planned SDK)
-To simplify extension development in the future, we plan to release a CLI tool (e.g., `aether-cli`) offering commands like:
-- `npm create aether-extension`
-- `aether init`
-- `aether dev` (for hot-reloading)
-- `aether pack` (to bundle into `.zip`)
-- `aether validate` (to check manifest and security constraints)
+## Developer Experience (Planned: Aether CLI)
+
+The Aether CLI (`aether`) is the planned official toolkit for creating, developing, testing, packaging, validating, and publishing Aether extensions. The goal is a new developer can go from nothing to a working extension in under five minutes.
+
+### Project Creation
+
+```
+aether init
+```
+
+Starts an interactive folder generator. You will be asked:
+
+- **Extension Name**
+- **Extension ID** (e.g. `com.example.my-extension`)
+- **Author**
+- **Version**
+- **Description**
+- **License**
+- **Extension Type**: Feature or Appearance Pack
+- **Framework**: Vanilla, React, Vue, Svelte, or Solid
+- **Homepage** *(optional)*
+- **Repository URL** *(optional)*
+
+Scaffolds the following structure:
+
+```
+my-extension/
+├── manifest.json
+├── package.json
+├── README.md
+├── LICENSE
+├── src/
+│   └── main.js
+├── ui/
+│   ├── index.html
+│   ├── main.js
+│   └── styles.css
+├── assets/
+└── .gitignore
+```
+
+> **Note**: Choosing a framework (React, Vue, Svelte, Solid) scaffolds a Vite build config inside `ui/` and requires a build step before the extension runs. Vanilla skips the build step entirely.
+
+---
+
+### Development
+
+```
+aether dev
+```
+
+Watches source files and hot-reloads the extension. Requires an active Aether instance to be running — if one is not detected, the command will print an error and exit rather than silently doing nothing. Shows extension logs, API calls, permission usage, and runtime errors with source maps.
+
+---
+
+### Validation
+
+```
+aether validate
+```
+
+Checks manifest syntax, missing files, invalid permissions, API compatibility, version format, duplicate IDs, invalid assets, missing icons, and missing metadata. Returns a clear pass/fail with specific error messages.
+
+---
+
+### Packaging
+
+```
+aether build
+```
+
+Produces a `my-extension.aex` file. Automatically minifies, compresses, validates, generates a checksum, and strips development files. The `.aex` format is Aether's first-class extension container.
+
+---
+
+### Testing
+
+```
+aether test
+```
+
+Runs optional API mocks, permission tests, UI snapshot tests, manifest validation, and integration tests.
+
+---
+
+### Version Management
+
+```
+aether version patch
+aether version minor
+aether version major
+```
+
+Automatically updates `manifest.json`, `package.json`, and `CHANGELOG`.
+
+---
+
+### Utilities
+
+| Command | Purpose |
+|---|---|
+| `aether lint` | Warns about unused permissions, deprecated APIs, missing metadata |
+| `aether fmt` | Formats `manifest.json`, source, and configuration |
+| `aether clean` | Removes build files |
+| `aether info` | Shows extension ID, version, API version, permissions, build size, author |
+| `aether migrate` | Upgrades manifest and API usage for new API versions |
+| `aether permissions` | Scans source code and suggests required permissions |
+| `aether docs <api>` | Searches and prints API documentation inline |
+| `aether examples` | Generates example code for sidebar pages, dialogs, loaders, etc. |
+
+---
+
+### Registry Commands
+
+```
+aether search <query>
+aether install <extension-id>
+aether remove <extension-id>
+aether update <extension-id>
+```
+
+---
+
+### Developer Tools
+
+```
+aether console    # Open extension console
+aether inspect    # Inspect a running extension
+aether trace      # View live API calls
+aether profile    # View performance metrics
+```
+
+---
+
+### Future Commands
+
+| Command | Purpose |
+|---|---|
+| `aether benchmark` | Measures startup time and memory usage |
+| `aether doctor` | Checks the development environment |
+| `aether sdk update` | Updates SDK templates to the latest version |
+| `aether create provider` | Scaffolds a new Loader Provider extension |
+| `aether create theme` | Scaffolds a new Appearance Pack |
+| `aether create loader` | Scaffolds a new Mod Loader extension |
