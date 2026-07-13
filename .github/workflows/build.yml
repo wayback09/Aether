@@ -1,0 +1,109 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows/amd64
+            output: Aether.exe
+            asset: Aether-windows-amd64.exe
+
+          - os: macos-latest
+            platform: darwin/universal
+            output: Aether.app
+            asset: Aether-macos-universal.zip
+
+          - os: ubuntu-latest
+            platform: linux/amd64
+            output: Aether
+            asset: Aether-linux-amd64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            libayatana-appindicator3-dev
+
+      - name: Build
+        run: wails build -platform ${{ matrix.platform }} -o ${{ matrix.output }}
+
+      - name: Package macOS binary
+        if: runner.os == 'macOS'
+        run: |
+          cd build/bin
+          zip -r ${{ matrix.asset }} ${{ matrix.output }}
+
+      - name: Rename Windows & Linux binary
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          mv build/bin/${{ matrix.output }} build/bin/${{ matrix.asset }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: build/bin/${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Aether ${{ github.ref_name }}"
+          prerelease: true
+          body: |
+            ## Aether ${{ github.ref_name }}
+
+            - Instance creation and management for Vanilla Minecraft
+            - Automatic Java detection across JAVA_HOME and PATH
+            - Mojang asset, library, and client JAR download pipeline
+            - Sandboxed JavaScript extension runtime (Goja)
+            - Extension Gallery with live registry fetch from GitHub
+            - Trust tiers: Official, Verified, Community, Local
+            - 1-click extension install from the in-app gallery
+            - Fabric mod loader via extension
+            - Modrinth mod browser via extension
+            - Extension sidebar pages rendered in isolated iframes
+            - Command Palette (Ctrl+Shift+P)
+            - Windows, macOS (Universal), and Linux builds
+          files: artifacts/*

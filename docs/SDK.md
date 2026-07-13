@@ -1,0 +1,128 @@
+# Aether SDK
+
+The Aether SDK (`@aether/sdk`) is the official development companion for building Aether extensions. It is a purely development-time package — it never ships inside your extension at runtime.
+
+## CLI vs SDK
+
+These are two separate but connected tools:
+
+- **CLI** (`aether`) — what you run in your terminal. Scaffolds projects, runs dev mode, packages extensions.
+- **SDK** (`@aether/sdk`) — what you import inside your extension's code. Provides types and helper utilities.
+
+## The Problem It Solves
+
+The `Aether` global object is injected directly into every extension's sandbox by the Go runtime. Without the SDK, the developer experience is rough:
+
+- No autocompletion — editors don't know what `Aether.ui` or `Aether.instances` contains.
+- No type safety — a typo like `Aether.instances.patcH()` is only caught at runtime.
+- No friendly error messages — raw sandbox errors are cryptic.
+
+The SDK fixes all of this without changing the runtime.
+
+## What the SDK Contains
+
+### 1. TypeScript Definitions
+
+The most important part. A `.d.ts` file that tells your editor exactly what every Aether API accepts and returns. No code from this runs at runtime — it is purely for your editor:
+
+```typescript
+declare global {
+  const Aether: {
+    ui: {
+      registerSidebarPage(opts: { id: string; label: string; url: string }): void;
+    };
+    instances: {
+      list(): Instance[];
+      patch(id: string, data: Partial<Instance>): void;
+    };
+    storage: {
+      get(key: string): unknown;
+      set(key: string, value: unknown): void;
+    };
+    notify: {
+      show(opts: { title: string; body: string }): void;
+    };
+  };
+}
+```
+
+### 2. Helper Utilities
+
+Thin wrappers that make common patterns cleaner and catch mistakes earlier:
+
+```javascript
+import { onReady, createLogger } from '@aether/sdk';
+
+const log = createLogger('my-extension');
+
+onReady(() => {
+  log.info('Extension started');
+
+  Aether.ui.registerSidebarPage({
+    id: 'my-page',
+    label: 'My Page',
+    url: 'ui/index.html',
+  });
+});
+```
+
+Available helpers:
+
+| Helper | Purpose |
+|---|---|
+| `onReady(fn)` | Runs your function once the sandbox is fully initialised |
+| `createLogger(name)` | Returns a namespaced logger (`log.info`, `log.warn`, `log.error`) |
+| `defineProvider(spec)` | Registers a typed Loader Provider with validation |
+| `storage.get / set` | Typed wrappers around `Aether.storage` |
+| `assertPermission(perm)` | Throws a clear error if a required permission was not declared |
+
+## Versioning
+
+The `"api"` field in `manifest.json` ties directly to the SDK version:
+
+```json
+{
+  "api": "1.0"
+}
+```
+
+When you install `@aether/sdk@1.0`, you get types and helpers that match Aether's runtime API at that version exactly. When Aether ships a new API version, `aether migrate` updates your manifest and you run:
+
+```
+npm install @aether/sdk@2.0
+```
+
+## What the SDK Does NOT Do
+
+- It does not ship any JavaScript into your packaged extension.
+- It does not replace the `Aether` global — that is always injected by the Go runtime.
+- It does not add a runtime dependency to your `.aex` file.
+
+The Go runtime is the single source of truth for what APIs actually exist. The SDK is a development-time mirror of that truth.
+
+## Full Developer Flow
+
+```
+aether init
+  └─ scaffolds project, installs @aether/sdk
+
+Edit main.js
+  └─ full autocomplete and type checking via SDK
+
+aether dev
+  └─ connects to a running Aether instance, hot-reloads on save
+
+aether validate
+  └─ checks your manifest against the declared SDK/API version
+
+aether build
+  └─ bundles into a .aex file, SDK types stripped automatically
+```
+
+## Installation (Planned)
+
+```
+npm install --save-dev @aether/sdk
+```
+
+The SDK will be published to npm when the extension ecosystem reaches a stable API. Until then, the TypeScript definitions are available directly inside the `extensions-src/` directory of the core repository as a reference.
