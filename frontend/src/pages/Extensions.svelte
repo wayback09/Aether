@@ -26,7 +26,8 @@
     galleryLoading = true;
     galleryError = '';
     try {
-      const res = await fetch(GALLERY_INDEX_URL);
+      const cacheBuster = new Date().getTime();
+      const res = await fetch(`${GALLERY_INDEX_URL}?t=${cacheBuster}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       galleryExtensions = await res.json();
     } catch (e) {
