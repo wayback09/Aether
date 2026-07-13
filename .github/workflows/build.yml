@@ -19,10 +19,10 @@ jobs:
             binary: Aether.exe
             asset: Aether-windows-amd64.exe
 
-          - os: macos-13
-            platform: darwin/universal
+          - os: macos-14
+            platform: darwin/arm64
             binary: Aether.app
-            asset: Aether-macos-universal.zip
+            asset: Aether-macos-arm64.zip
 
           - os: ubuntu-22.04
             platform: linux/amd64
@@ -113,5 +113,6 @@ jobs:
             - Modrinth mod browser via extension
             - Extension sidebar pages rendered in isolated iframes
             - Command Palette (Ctrl+Shift+P)
-            - Windows, macOS (Universal), and Linux builds
+            - Windows, macOS (Apple Silicon), and Linux builds
+            - Intel Mac support coming in a future release
           files: artifacts/*
