@@ -264,6 +264,12 @@
     margin-bottom: var(--spacing-xl);
   }
 
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: var(--spacing-lg);
+  }
+
   .header-actions {
     display: flex;
     align-items: center;
