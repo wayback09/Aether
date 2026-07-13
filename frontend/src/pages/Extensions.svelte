@@ -211,8 +211,12 @@
             <div class="card-accent" style="background: {grad};"></div>
             <div class="card-body">
               <div class="ext-header">
-                <div class="ext-icon" style="background: {grad};">
-                  <span class="ext-icon-letter">{ext.name.charAt(0).toUpperCase()}</span>
+                <div class="ext-icon" style={!ext.iconUrl ? `background: ${grad};` : ''}>
+                  {#if ext.iconUrl}
+                    <img src={ext.iconUrl} alt={ext.name} class="ext-icon-img" />
+                  {:else}
+                    <span class="ext-icon-letter">{ext.name.charAt(0).toUpperCase()}</span>
+                  {/if}
                 </div>
                 <div class="ext-info">
                   <div class="ext-title-row">

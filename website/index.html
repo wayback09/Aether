@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A minimal, extensible, lightning-fast Minecraft launcher. Everything beyond launching Minecraft is an extension.">
+    <title>Aether</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-inner">
+                <div class="header-left">
+                    <a href="/" class="header-brand">
+                        <img src="logo.png" alt="Aether" class="header-logo">
+                        <span>Aether</span>
+                    </a>
+                    <nav>
+                        <ul class="header-nav">
+                            <li><a href="#features">Features</a></li>
+                            <li><a href="#extensions">Extensions</a></li>
+                            <li><a href="#architecture">Architecture</a></li>
+                        </ul>
+                    </nav>
+                </div>
+                <div class="header-actions">
+                    <a href="https://github.com/wayback09/Aether/releases" class="btn btn-download" target="_blank" rel="noopener">Download</a>
+                    <a href="https://github.com/wayback09/Aether" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+                </div>
+                <button class="mobile-toggle" aria-label="Toggle menu">Menu</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="hero-section">
+                <div class="hero-inner">
+                    <div class="hero-text">
+                        <h1 class="hero-title">Aether</h1>
+                        <p class="hero-tagline">A minimal, extensible, lightning-fast Minecraft launcher.</p>
+                        <p class="hero-desc">This launcher exists to launch Minecraft, and nothing more. Every non-essential feature is an extension. Think of it as the VS Code of Minecraft launchers.</p>
+                        <div class="hero-actions">
+                            <a href="https://github.com/wayback09/Aether/releases" class="btn btn-download btn-lg" target="_blank" rel="noopener">Download</a>
+                            <a href="https://github.com/wayback09/Aether" class="btn btn-ghost btn-lg" target="_blank" rel="noopener">View Source</a>
+                        </div>
+                    </div>
+                    <div class="hero-visual">
+                        <img src="logo.png" alt="Aether Logo" class="hero-logo">
+                    </div>
+                </div>
+            </section>
+
+            <section id="features" class="panel-section">
+                <div class="panel prose">
+                    <h2>Features</h2>
+
+                    <h3>Blazing Fast</h3>
+                    <p>Cold starts in under 2 seconds. Idle memory footprint below 100MB. Navigation is instant. Aether is built to feel like a native system utility, not another Electron app.</p>
+
+                    <h3>Minimalist UI</h3>
+                    <p>Clean, native-feeling design with a frameless window. Dark mode first. Inspired by VS Code, Linear, Raycast, and Notion. The UI never gets in your way.</p>
+
+                    <h3>Extensible Architecture</h3>
+                    <p>Everything beyond launching Minecraft is an extension. Mod loaders, mod browsers, server lists -- all pluggable. Extensions run in isolated Goja JavaScript sandboxes with a rich API.</p>
+
+                    <h3>Instance Management</h3>
+                    <p>Create, rename, delete, import, and export Minecraft instances. Each instance has its own version, mod loader, and memory allocation. Switch between setups without any hassle.</p>
+
+                    <h3>Secure Sandbox</h3>
+                    <p>Extensions run in strict capability-based JavaScript isolates. They cannot access your filesystem, OS, authentication tokens, or other extensions. Trust is explicit and granular.</p>
+
+                    <h3>Automatic Java Management</h3>
+                    <p>Detects, downloads, and manages Java runtimes from Adoptium. Required Java version is auto-detected based on your Minecraft version. No manual setup needed.</p>
+
+                    <h3>Microsoft OAuth2</h3>
+                    <p>Full Microsoft / Xbox / XSTS / Minecraft authentication chain. Also supports offline accounts for development and testing.</p>
+
+                    <h3>Command Palette</h3>
+                    <p>Ctrl+Shift+P command palette for quick navigation and actions. Jump to any page, create instances, or toggle settings without leaving the keyboard.</p>
+                </div>
+            </section>
+
+            <section id="extensions" class="panel-section">
+                <div class="panel prose">
+                    <h2>Extension System</h2>
+                    <p>Aether's power comes from its extensions. The core stays lean while the community builds on top. Extensions can register sidebar pages, add instance types, hook into the launch pipeline, and communicate with the UI via a secure IPC bridge.</p>
+
+                    <h3>Built-in Extensions</h3>
+                    <p><strong>Fabric</strong> -- Install and manage the Fabric mod loader for any instance. Handles classpath injection and version resolution automatically.</p>
+                    <p><strong>Modrinth Browser</strong> -- Browse and install mods from Modrinth directly into your instances. Search, filter, and install with a clean interface.</p>
+
+                    <h3>For Developers</h3>
+                    <p>Extensions run in Goja JavaScript sandboxes with a well-documented API. The <code>Aether</code> global object provides access to instances, extensions, UI, auth, and Java subsystems. Extensions are packaged as ZIP files with a manifest and can be distributed through the live Extension Gallery.</p>
+
+                    <div class="api-list">
+                        <code>Aether.instances</code>
+                        <code>Aether.extensions</code>
+                        <code>Aether.ui</code>
+                        <code>Aether.auth</code>
+                        <code>Aether.java</code>
+                    </div>
+
+                    <a href="https://github.com/wayback09/Aether/blob/main/docs/API.md" class="btn btn-ghost" target="_blank" rel="noopener">Read the API Docs</a>
+                </div>
+            </section>
+
+            <section id="architecture" class="panel-section">
+                <div class="panel prose">
+                    <h2>Built with</h2>
+                    <p>Aether is built with modern tools chosen for performance and reliability.</p>
+                </div>
+                <div class="tech-grid">
+                    <div class="tech-card">
+                        <strong>Go</strong>
+                        <span>Backend and extension runtime</span>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Wails v2</strong>
+                        <span>Desktop application framework</span>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Svelte</strong>
+                        <span>Frontend UI</span>
+                    </div>
+                    <div class="tech-card">
+                        <strong>TypeScript</strong>
+                        <span>Type-safe frontend code</span>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Goja</strong>
+                        <span>ECMAScript sandbox for extensions</span>
+                    </div>
+                    <div class="tech-card">
+                        <strong>WebView2</strong>
+                        <span>Chromium-based rendering</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel-section">
+                <div class="panel prose">
+                    <h2>Performance Goals</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">&lt; 2s</div>
+                        <div class="stat-label">Cold Start</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">&lt; 100MB</div>
+                        <div class="stat-label">Idle Memory</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">60 FPS</div>
+                        <div class="stat-label">Animations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">Instant</div>
+                        <div class="stat-label">Navigation</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel-section">
+                <div class="panel prose">
+                    <h2>Get Involved</h2>
+                    <p>Aether is an open-source project and we welcome contributions from the community. You can find the source code on <a href="https://github.com/wayback09/Aether" target="_blank" rel="noopener">GitHub</a>.</p>
+                    <div class="social-grid">
+                        <a href="https://github.com/wayback09/Aether" class="social-card" target="_blank" rel="noopener" aria-label="GitHub">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-inner">
+                <a href="/" class="footer-brand">
+                    <img src="logo.png" alt="Aether" class="footer-logo">
+                    <span>Aether</span>
+                </a>
+                <div class="footer-links">
+                    <a href="https://github.com/wayback09/Aether" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/wayback09/Aether/blob/main/docs/EXTENSIONS.md" target="_blank" rel="noopener">Extensions</a>
+                    <a href="https://github.com/wayback09/Aether/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
+                    <a href="https://github.com/wayback09/Aether/blob/main/docs/API.md" target="_blank" rel="noopener">API</a>
+                </div>
+                <p class="footer-copy">Built by CyberDroid456</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
