@@ -137,12 +137,12 @@
   .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 22px;
-    font-weight: 700;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 800;
     margin-bottom: 36px;
     padding: 0 12px;
-    letter-spacing: -0.5px;
+    letter-spacing: 0.5px;
   }
 
   .sidebar-logo {
