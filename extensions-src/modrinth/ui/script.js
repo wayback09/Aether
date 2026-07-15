@@ -86,7 +86,9 @@ function initCustomSelect(containerEl) {
         },
         close
     };
-}────
+}
+
+// ── IPC Bridge ────────────────────────────────────────────────────────────
 const pending = {};
 let reqCounter = 0;
 
