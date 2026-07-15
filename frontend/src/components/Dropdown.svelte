@@ -105,15 +105,16 @@
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    background: rgba(28, 28, 28, 0.65); /* Semi-transparent panel-bg */
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(22, 22, 22, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: var(--border-radius);
     max-height: 200px;
     overflow-y: auto;
     z-index: 2000;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    padding: 4px 0;
   }
   
   .dropdown-options.drop-up {
@@ -124,19 +125,21 @@
   .dropdown-option {
     padding: 10px 12px;
     cursor: pointer;
-    color: var(--text-secondary);
+    color: var(--text-meta);
     transition: background 0.1s, color 0.1s;
+    border-left: 2px solid transparent;
   }
 
   .dropdown-option:not(.opt-disabled):hover {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.06);
     color: white;
   }
 
   .dropdown-option.selected {
-    color: var(--accent);
-    background: rgba(0,0,0,0.2);
-    font-weight: 500;
+    color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.1);
+    border-left-color: var(--accent-color);
+    font-weight: 600;
   }
 
   .dropdown-option.opt-disabled {
@@ -147,16 +150,19 @@
   
   /* Custom Scrollbar */
   .dropdown-options::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
   .dropdown-options::-webkit-scrollbar-track {
     background: transparent;
   }
   .dropdown-options::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.15);
-    border-radius: 3px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
   .dropdown-options::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.25);
+    background-clip: content-box;
   }
 </style>

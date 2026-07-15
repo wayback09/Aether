@@ -1,6 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { GetInstances, UpdateInstance, DeleteInstance, LaunchInstance } from '../../wailsjs/go/main/App.js';
+  import Dropdown from '../components/Dropdown.svelte';
+  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte';
 
   export let instanceId = '';
 
@@ -47,16 +49,27 @@
     }
   }
 
+  let confirmDialog: any;
+  let pendingDelete = false;
+
   async function deleteInstance() {
     if (!instance) return;
-    if (confirm(`Are you sure you want to delete ${instance.name}? This cannot be undone.`)) {
-      try {
-        await DeleteInstance(instance.id);
-        dispatch('navigate', 'instances');
-      } catch (e) {
-        console.error("Failed to delete instance:", e);
-      }
-    }
+    confirmDialog.open(
+      `Delete ${instance.name}?`,
+      `Are you sure you want to delete "${instance.name}"? This will permanently remove all its files and cannot be undone.`,
+      true
+    );
+  }
+
+  function handleDeleteConfirm(event: CustomEvent<boolean>) {
+    if (!event.detail || !instance || pendingDelete) return;
+    pendingDelete = true;
+    DeleteInstance(instance.id).then(() => {
+      dispatch('navigate', 'instances');
+    }).catch((e: any) => {
+      console.error("Failed to delete instance:", e);
+      pendingDelete = false;
+    });
   }
 
   function launch() {
@@ -113,12 +126,9 @@
       </div>
 
       <div class="form-group">
-        <label for="memory">Memory Allocation</label>
-        <select id="memory" bind:value={editMemory} class="input select">
-          {#each memoryOptions as opt}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
+        <!-- svelte-ignore a11y-label-has-associated-control -->
+        <label>Memory Allocation</label>
+        <Dropdown options={memoryOptions} bind:value={editMemory} />
       </div>
 
       <div class="actions">
@@ -133,6 +143,8 @@
     <div class="loading">Loading instance...</div>
   {/if}
 </div>
+
+<ConfirmDialog bind:this={confirmDialog} on:confirm={handleDeleteConfirm} />
 
 <style>
   .page {
@@ -220,16 +232,6 @@
 
   .input:focus {
     border-color: var(--accent-color);
-  }
-
-  .select {
-    appearance: none;
-    cursor: pointer;
-  }
-
-  .select option {
-    background: var(--panel-bg);
-    color: var(--text-primary);
   }
 
   .actions {

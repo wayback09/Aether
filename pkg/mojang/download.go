@@ -151,8 +151,16 @@ func (e *DownloadEngine) Install(info *VersionInfo, assetsDir string) error {
 	return nil
 }
 
+// Shared HTTP client with timeout to prevent hanging on connection drops
+var downloadClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		ResponseHeaderTimeout: 10 * time.Second,
+		IdleConnTimeout:       30 * time.Second,
+	},
+}
+
 func (e *DownloadEngine) downloadFile(url string, dest string) error {
-	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return err
 	}
@@ -163,19 +171,23 @@ func (e *DownloadEngine) downloadFile(url string, dest string) error {
 	}
 
 	tempDest := dest + ".tmp"
-	maxRetries := 3
+	maxRetries := 5
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
 		err := func() error {
-			resp, err := http.Get(url)
+			req, err := http.NewRequestWithContext(e.ctx, "GET", url, nil)
+			if err != nil {
+				return err
+			}
+			resp, err := downloadClient.Do(req)
 			if err != nil {
 				return err
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("failed to download: status %d", resp.StatusCode)
+				return fmt.Errorf("unexpected status %d", resp.StatusCode)
 			}
 
 			out, err := os.Create(tempDest)
@@ -191,19 +203,17 @@ func (e *DownloadEngine) downloadFile(url string, dest string) error {
 		}()
 
 		if err == nil {
-			// Rename temporary file to final destination atomically.
-			// Replaces existing file if present.
 			if err := os.Rename(tempDest, dest); err != nil {
-				// Fallback for cross-device rename errors
 				return fmt.Errorf("failed to rename temp file: %w", err)
 			}
 			return nil
 		}
 
 		lastErr = err
-		// Clean up the partial temp file before retrying
 		os.Remove(tempDest)
-		time.Sleep(1 * time.Second)
+
+		// Exponential backoff: 1s, 2s, 4s, 8s
+		time.Sleep(time.Duration(1<<i) * time.Second)
 	}
 
 	return fmt.Errorf("failed to download after %d retries, last error: %w", maxRetries, lastErr)

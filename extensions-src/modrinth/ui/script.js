@@ -1,4 +1,92 @@
-// ── IPC Bridge ────────────────────────────────────────────────────────────────
+// ── Custom Select (replaces native <select>) ──────────────────────────────
+
+function initCustomSelect(containerEl) {
+    const trigger = containerEl.querySelector('.custom-select-trigger');
+    const optionsEl = containerEl.querySelector('.custom-select-options');
+    const textEl = containerEl.querySelector('.custom-select-text');
+    const chevron = containerEl.querySelector('.custom-select-chevron');
+
+    function close() {
+        optionsEl.classList.add('hidden');
+        trigger.classList.remove('open');
+        chevron.classList.remove('open');
+    }
+
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpening = optionsEl.classList.contains('hidden');
+        // Close all other open dropdowns
+        document.querySelectorAll('.custom-select-options').forEach(o => {
+            if (o !== optionsEl) o.classList.add('hidden');
+        });
+        document.querySelectorAll('.custom-select-trigger').forEach(t => {
+            if (t !== trigger) t.classList.remove('open');
+        });
+        document.querySelectorAll('.custom-select-chevron').forEach(c => {
+            if (c !== chevron) c.classList.remove('open');
+        });
+        if (isOpening) {
+            optionsEl.classList.remove('hidden');
+            trigger.classList.add('open');
+            chevron.classList.add('open');
+        } else {
+            close();
+        }
+    });
+
+    // Click outside closes all
+    document.addEventListener('click', () => close(), { once: false });
+
+    return {
+        container: containerEl,
+        trigger,
+        optionsEl,
+        textEl,
+        setOptions(options) {
+            optionsEl.innerHTML = options.map((opt, i) =>
+                `<div class="custom-select-option" data-index="${i}">${opt.label}</div>`
+            ).join('');
+
+            // Store values as data attributes on the container
+            containerEl._optionValues = options.map(o => o.value);
+            containerEl._selectedIndex = -1;
+
+            // Attach click handlers
+            optionsEl.querySelectorAll('.custom-select-option').forEach(el => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.index, 10);
+                    containerEl._selectedIndex = idx;
+                    textEl.textContent = options[idx].label;
+                    textEl.classList.add('selected');
+                    // Highlight selected
+                    optionsEl.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+                    el.classList.add('selected');
+                    close();
+                    // Trigger change event
+                    containerEl.dispatchEvent(new CustomEvent('change', { detail: { value: options[idx].value, index: idx } }));
+                });
+            });
+
+            // Auto-select first
+            if (options.length > 0) {
+                containerEl._selectedIndex = 0;
+                textEl.textContent = options[0].label;
+                textEl.classList.add('selected');
+                optionsEl.querySelector('.custom-select-option')?.classList.add('selected');
+            } else {
+                textEl.textContent = 'No options';
+                textEl.classList.remove('selected');
+            }
+        },
+        getValue() {
+            if (containerEl._selectedIndex >= 0 && containerEl._optionValues) {
+                return containerEl._optionValues[containerEl._selectedIndex];
+            }
+            return null;
+        },
+        close
+    };
+}────
 const pending = {};
 let reqCounter = 0;
 
@@ -32,8 +120,8 @@ const modal          = document.getElementById('installModal');
 const modalModName   = document.getElementById('modalModName');
 const modalModAuthor = document.getElementById('modalModAuthor');
 const modalModIcon   = document.getElementById('modalModIcon');
-const versionSelect  = document.getElementById('versionSelect');
-const instanceSelect = document.getElementById('instanceSelect');
+const versionSelect  = initCustomSelect(document.getElementById('versionSelect'));
+const instanceSelect = initCustomSelect(document.getElementById('instanceSelect'));
 const installBtn     = document.getElementById('installBtn');
 const installBtnText = document.getElementById('installBtnText');
 const cancelBtn      = document.getElementById('cancelBtn');
@@ -125,8 +213,8 @@ async function openInstallModal(mod) {
     }
 
     // Reset state
-    versionSelect.innerHTML = '<option>Loading versions...</option>';
-    instanceSelect.innerHTML = '<option>Loading instances...</option>';
+    versionSelect.setOptions([{ label: 'Loading versions...', value: '' }]);
+    instanceSelect.setOptions([{ label: 'Loading instances...', value: '' }]);
     installStatus.classList.add('hidden');
     installStatus.textContent = '';
     installBtnText.textContent = 'Install';
@@ -141,19 +229,23 @@ async function openInstallModal(mod) {
 
     // Populate versions
     currentVersions = versionsRes;
-    versionSelect.innerHTML = versionsRes.length
-        ? versionsRes.map((v, i) =>
-            `<option value="${i}">${v.version_number} — ${v.name} (${v.game_versions.slice(0,3).join(', ')})</option>`
-          ).join('')
-        : '<option>No versions found</option>';
+    versionSelect.setOptions(versionsRes.length
+        ? versionsRes.map((v, i) => ({
+            label: `${v.version_number} — ${v.name} (${v.game_versions.slice(0,3).join(', ')})`,
+            value: String(i)
+          }))
+        : [{ label: 'No versions found', value: '' }]
+    );
 
     // Populate instances
     const instances = instancesMsg.instances || [];
-    instanceSelect.innerHTML = instances.length
-        ? instances.map(inst =>
-            `<option value="${inst.id}">${inst.name} (${inst.version} • ${inst.loader})</option>`
-          ).join('')
-        : '<option value="">No instances found</option>';
+    instanceSelect.setOptions(instances.length
+        ? instances.map(inst => ({
+            label: `${inst.name} (${inst.version} • ${inst.loader})`,
+            value: inst.id
+          }))
+        : [{ label: 'No instances found', value: '' }]
+    );
 }
 
 function closeModal() {
@@ -166,14 +258,15 @@ cancelBtn.addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
 installBtn.addEventListener('click', async () => {
-    const vIdx = parseInt(versionSelect.value, 10);
-    const instanceId = instanceSelect.value;
+    const vIdxStr = versionSelect.getValue();
+    const instanceId = instanceSelect.getValue();
 
-    if (isNaN(vIdx) || !instanceId) {
+    if (vIdxStr === null || !instanceId) {
         showStatus('Please select a version and instance.', 'error');
         return;
     }
 
+    const vIdx = parseInt(vIdxStr, 10);
     const version = currentVersions[vIdx];
     // Pick the primary jar file
     const file = version.files.find(f => f.primary) || version.files[0];

@@ -45,18 +45,24 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 		return fmt.Errorf("failed to parse asset index: %w", err)
 	}
 
-	// Download all asset objects concurrently
+	// Deduplicate assets by hash to avoid concurrent write collisions on identical files
+	uniqueAssets := make(map[string]AssetObject)
+	for _, obj := range indexData.Objects {
+		uniqueAssets[obj.Hash] = obj
+	}
+
+	// Download all unique asset objects concurrently
 	objectsDir := filepath.Join(assetsDir, "objects")
-	totalAssets := len(indexData.Objects)
+	totalAssets := len(uniqueAssets)
 	var completed int
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	errors := make(chan error, totalAssets)
 	sem := make(chan struct{}, 15) // Limit concurrency
 
-	for name, obj := range indexData.Objects {
-		prefix := obj.Hash[:2]
-		objPath := filepath.Join(objectsDir, prefix, obj.Hash)
+	for hash, obj := range uniqueAssets {
+		prefix := hash[:2]
+		objPath := filepath.Join(objectsDir, prefix, hash)
 
 		// Skip if already downloaded
 		if info, err := os.Stat(objPath); err == nil && info.Size() == obj.Size {
@@ -67,14 +73,14 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 		}
 
 		wg.Add(1)
-		go func(assetName string, assetObj AssetObject, dest string) {
+		go func(h string, assetObj AssetObject, dest string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			url := fmt.Sprintf("https://resources.download.minecraft.net/%s/%s", assetObj.Hash[:2], assetObj.Hash)
+			url := fmt.Sprintf("https://resources.download.minecraft.net/%s/%s", h[:2], h)
 			if err := e.downloadFile(url, dest); err != nil {
-				errors <- fmt.Errorf("asset %s: %w", assetName, err)
+				errors <- fmt.Errorf("asset %s: %w", h, err)
 				return
 			}
 
@@ -91,7 +97,7 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 					"status":   fmt.Sprintf("Downloading assets (%d/%d)", completed, totalAssets),
 				})
 			}
-		}(name, obj, objPath)
+		}(hash, obj, objPath)
 	}
 
 	wg.Wait()
