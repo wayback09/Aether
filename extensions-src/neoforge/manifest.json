@@ -1,0 +1,18 @@
+{
+  "id": "neoforge",
+  "name": "NeoForge",
+  "version": "1.0.0",
+  "author": "Aether Team",
+  "description": "Adds support for launching the NeoForge mod loader.",
+  "icon": "icon.png",
+  "main": "main.js",
+  "permissions": [
+    "launcher:modloader",
+    "network:http",
+    "fs:download"
+  ],
+  "hosts": [
+    "api.neoforged.net",
+    "maven.neoforged.net"
+  ]
+}
