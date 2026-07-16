@@ -2,6 +2,7 @@ package extensions
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 
 	"Aether/pkg/fs"
 	"github.com/dop251/goja"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Sandbox represents an isolated JavaScript environment for an extension
@@ -30,7 +30,9 @@ type InstanceInfo struct {
 	Loader  string
 }
 
-// NewSandbox creates a new Goja isolate restricted by the given manifest
+// NewSandbox creates a new Goja isolate restricted by the given manifest.
+// emit is an optional function for broadcasting events (e.g. runtime.EventsEmit);
+// pass nil to disable event broadcasting (useful in tests).
 func NewSandbox(
 	ctx context.Context,
 	manifest Manifest,
@@ -39,7 +41,11 @@ func NewSandbox(
 	onModLoader func(ModLoaderConfig),
 	listInstances func() []InstanceInfo,
 	installMod func(instanceID, jarName, downloadURL string) (string, error),
+	emit func(ctx context.Context, event string, data ...interface{}),
 ) *Sandbox {
+	if emit == nil {
+		emit = func(_ context.Context, _ string, _ ...interface{}) {}
+	}
 	vm := goja.New()
 	
 	// Create the secure Aether bridge object
@@ -78,7 +84,7 @@ func NewSandbox(
 					onSidebarPage(payload)
 				}
 				
-				runtime.EventsEmit(ctx, "extension:sidebar:add", payload)
+				emit(ctx, "extension:sidebar:add", payload)
 			}
 			return goja.Undefined()
 		})
@@ -239,6 +245,36 @@ func NewSandbox(
 		aetherObj.Set("launcher", launcherObj)
 	}
 
+	// Capability: skin:export
+	if manifest.HasPermission("skin:export") {
+		skinsObj := vm.NewObject()
+		skinsObj.Set("export", func(call goja.FunctionCall) goja.Value {
+			b64Data := call.Argument(0).String()
+			filename := call.Argument(1).String()
+			if filename == "" {
+				filename = "skin.png"
+			}
+
+			skinsDir := filepath.Join(fs.GetDataDir(), "skins")
+			if err := os.MkdirAll(skinsDir, 0755); err != nil {
+				panic(vm.NewGoError(err))
+			}
+
+			safePath := filepath.Join(skinsDir, filepath.Clean(filename))
+			data, err := base64.StdEncoding.DecodeString(b64Data)
+			if err != nil {
+				panic(vm.NewGoError(fmt.Errorf("invalid base64 data: %w", err)))
+			}
+
+			if err := os.WriteFile(safePath, data, 0644); err != nil {
+				panic(vm.NewGoError(err))
+			}
+
+			return vm.ToValue(safePath)
+		})
+		aetherObj.Set("skins", skinsObj)
+	}
+
 	// Capability: ui:sidebar - also inject IPC methods
 	if manifest.HasPermission("ui:sidebar") {
 		// Grab the existing uiObj that was created earlier (or create if somehow nil)
@@ -257,7 +293,7 @@ func NewSandbox(
 
 		uiIPC.Set("postMessage", func(call goja.FunctionCall) goja.Value {
 			if len(call.Arguments) > 0 {
-				runtime.EventsEmit(ctx, "extension:message:"+manifest.ID, call.Argument(0).Export())
+				emit(ctx, "extension:message:"+manifest.ID, call.Argument(0).Export())
 			}
 			return goja.Undefined()
 		})

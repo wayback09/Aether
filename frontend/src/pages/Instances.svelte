@@ -156,19 +156,6 @@
     gap: var(--spacing-md);
   }
 
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 50vh;
-    color: var(--text-secondary);
-  }
-
-  .empty-state h3 {
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-sm);
-  }
 
   .grid {
     display: grid;

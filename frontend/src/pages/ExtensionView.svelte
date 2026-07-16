@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { SendExtensionMessage } from '../../wailsjs/go/main/App.js';
-  import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime.js';
+  import { EventsOn } from '../../wailsjs/runtime/runtime.js';
 
   export let url: string = '';
   export let extID: string = '';
@@ -43,7 +43,7 @@
       bind:this={iframeEl}
       src={url}
       title="Extension View"
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts allow-same-origin allow-downloads"
     ></iframe>
   {:else}
     <div class="placeholder">

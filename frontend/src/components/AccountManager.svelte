@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { GetActiveAccount } from '../../wailsjs/go/main/App';
-  import { auth } from '../../wailsjs/go/models';
+  import type { auth } from '../../wailsjs/go/models';
   import LoginModal from './LoginModal.svelte';
 
   let activeAccount: auth.Account | null = null;
@@ -38,7 +38,7 @@
     <div class="details">
       {#if activeAccount}
         <span class="username">{activeAccount.username}</span>
-        <span class="status">Offline Account</span>
+        <span class="status">{activeAccount.type === 'microsoft' ? 'Microsoft Account' : 'Offline Account'}</span>
       {:else}
         <span class="username">Guest</span>
         <span class="status">Offline</span>
@@ -76,7 +76,7 @@
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    background: var(--primary-color);
+    background: var(--accent-color);
     display: flex;
     align-items: center;
     justify-content: center;

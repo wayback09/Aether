@@ -149,6 +149,7 @@ func (m *Manager) LoadAll() error {
 					}
 					return destPath, nil
 				},
+				runtime.EventsEmit,
 			)
 			m.sandboxes[manifest.ID] = sandbox
 

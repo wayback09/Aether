@@ -19,7 +19,8 @@
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
-  let extensionTabs: Array<{ id: string; label: string; url: string; icon?: string }> = [];
+  type ExtensionTab = { id: string; label: string; url: string; icon?: string };
+  let extensionTabs: ExtensionTab[] = [];
 
   onMount(async () => {
     // Fetch extension UI tabs registered during backend startup
@@ -27,9 +28,10 @@
       const cachedTabs = await GetExtensionSidebarPages();
       if (cachedTabs) {
         for (const tab of cachedTabs) {
-          if (!extensionTabs.find((t) => t.id === tab.id)) {
-            extensionTabs = [...extensionTabs, tab];
-            dispatch('registerExtensionRoute', tab);
+          const t = tab as ExtensionTab;
+          if (!extensionTabs.find((e) => e.id === t.id)) {
+            extensionTabs = [...extensionTabs, t];
+            dispatch('registerExtensionRoute', t);
           }
         }
       }
@@ -38,10 +40,11 @@
     }
 
     // Listen for extension UI tabs registered dynamically at runtime
-    EventsOn('extension:sidebar:add', (payload: any) => {
-      if (!extensionTabs.find((t) => t.id === payload.id)) {
-        extensionTabs = [...extensionTabs, payload];
-        dispatch('registerExtensionRoute', payload);
+    EventsOn('extension:sidebar:add', (payload: unknown) => {
+      const tab = payload as ExtensionTab;
+      if (!extensionTabs.find((t) => t.id === tab.id)) {
+        extensionTabs = [...extensionTabs, tab];
+        dispatch('registerExtensionRoute', tab);
       }
     });
   });

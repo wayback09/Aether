@@ -37,7 +37,14 @@
 <svelte:window on:click={handleOutsideClick} />
 
 <div class="custom-dropdown" bind:this={dropdownRef} class:disabled>
-  <div class="dropdown-selected" on:click={toggle} class:open={isOpen}>
+  <div
+    class="dropdown-selected"
+    role="button"
+    tabindex="0"
+    on:click={toggle}
+    on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggle()}
+    class:open={isOpen}
+  >
     <span>{selectedLabel}</span>
     <svg class="chevron" class:open={isOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 9 12 15 18 9"></polyline>
@@ -47,10 +54,16 @@
   {#if isOpen}
     <div class="dropdown-options" class:drop-up={direction === 'up'}>
       {#each options as opt}
-        <div class="dropdown-option" 
-             class:selected={opt.value === value} 
-             class:opt-disabled={opt.disabled}
-             on:click={() => selectOption(opt)}>
+        <div
+          class="dropdown-option"
+          class:selected={opt.value === value}
+          class:opt-disabled={opt.disabled}
+          role="option"
+          aria-selected={opt.value === value}
+          tabindex="0"
+          on:click={() => selectOption(opt)}
+          on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectOption(opt)}
+        >
           {opt.label}
         </div>
       {/each}

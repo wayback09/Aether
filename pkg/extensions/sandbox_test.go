@@ -1,6 +1,7 @@
 package extensions
 
 import (
+	"context"
 	"testing"
 )
 
@@ -11,11 +12,20 @@ func TestSandboxCapabilities(t *testing.T) {
 		Permissions: []string{"ui:sidebar"},
 	}
 	
-	sandbox1 := NewSandbox(manifestAllowed)
+	sandbox1 := NewSandbox(
+		context.Background(),
+		manifestAllowed,
+		"http://localhost",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil, // emit: nil disables Wails event broadcasting in tests
+	)
 	
 	// This should succeed without panic
 	script1 := `
-		Aether.ui.registerSidebarPage({ id: "test", title: "Test Page" });
+		Aether.ui.registerSidebarPage({ id: "test", label: "Test Page", url: "ui/index.html" });
 	`
 	err := sandbox1.Execute(script1)
 	if err != nil {
@@ -28,11 +38,20 @@ func TestSandboxCapabilities(t *testing.T) {
 		Permissions: []string{},
 	}
 	
-	sandbox2 := NewSandbox(manifestDenied)
+	sandbox2 := NewSandbox(
+		context.Background(),
+		manifestDenied,
+		"http://localhost",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil, // emit: nil disables Wails event broadcasting in tests
+	)
 	
 	// This should throw a JS error because Aether.ui is undefined
 	script2 := `
-		Aether.ui.registerSidebarPage({ id: "test", title: "Test Page" });
+		Aether.ui.registerSidebarPage({ id: "test", label: "Test Page", url: "ui/index.html" });
 	`
 	err = sandbox2.Execute(script2)
 	if err == nil {

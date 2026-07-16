@@ -29,9 +29,21 @@
 </script>
 
 {#if show}
-  <div class="overlay" on:click|self={cancel}>
-    <div class="dialog" on:click={(e) => e.stopPropagation()}>
-      <h3 class="dialog-title">{title}</h3>
+  <div
+    class="overlay"
+    role="presentation"
+    on:click|self={cancel}
+    on:keydown={(e) => e.key === 'Escape' && cancel()}
+  >
+    <div
+      class="dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+      on:click={(e) => e.stopPropagation()}
+      on:keydown={(e) => e.stopPropagation()}
+    >
+      <h3 class="dialog-title" id="dialog-title">{title}</h3>
       <p class="dialog-message">{message}</p>
       <div class="dialog-actions">
         <button class="btn btn-secondary" on:click={cancel}>{cancelLabel}</button>
