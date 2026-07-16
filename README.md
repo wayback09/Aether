@@ -13,7 +13,8 @@ Every feature that is not essential to launching the game—like downloading mod
 ## Features
 
 - **Blazing Fast**: Cold starts in under 2 seconds with an idle memory footprint below 100MB.
-- **Minimalist UI**: Clean, native-feeling, elegant design that gets out of your way.
+- **Minimalist UI**: Clean, native-feeling, elegant design that gets out of your way, complete with smooth custom toast notifications.
+- **Snapshot Support**: Effortlessly toggle between stable releases and latest snapshots when creating instances.
 - **Extensible Architecture**: Everything from Modrinth integration to server browsers is an extension.
 - **Secure Sandbox**: Extensions run in a strict capability-based JavaScript isolate to protect your session tokens and your operating system.
 
