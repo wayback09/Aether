@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"Aether/pkg/fs"
+	"Aether/pkg/netutil"
 	"github.com/dop251/goja"
 )
 
@@ -141,24 +142,8 @@ func NewSandbox(
 			
 			// Force destPath to be within the instances/libraries folder
 			safePath := filepath.Join(fs.GetDataDir(), "libraries", filepath.Clean(destPath))
-			if err := os.MkdirAll(filepath.Dir(safePath), 0755); err != nil {
-				panic(vm.NewGoError(err))
-			}
 			
-			resp, err := http.Get(targetURL)
-			if err != nil {
-				panic(vm.NewGoError(err))
-			}
-			defer resp.Body.Close()
-			
-			out, err := os.Create(safePath)
-			if err != nil {
-				panic(vm.NewGoError(err))
-			}
-			defer out.Close()
-			
-			_, err = io.Copy(out, resp.Body)
-			if err != nil {
+			if err := netutil.DownloadFile(ctx, targetURL, safePath, nil); err != nil {
 				panic(vm.NewGoError(err))
 			}
 			return vm.ToValue(safePath)

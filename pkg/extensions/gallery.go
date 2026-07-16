@@ -1,13 +1,14 @@
 package extensions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"sync"
 	"time"
+	"Aether/pkg/netutil"
 )
 
 const galleryIndexURL = "https://raw.githubusercontent.com/wayback09/Aether-Extensions/main/index.json"
@@ -68,27 +69,17 @@ func GetGalleryExtensions() []GalleryExtension {
 
 // DownloadAndInstallExtension downloads a zip file from a trusted Registry URL and installs it.
 func DownloadAndInstallExtension(url string) error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return fmt.Errorf("failed to download extension: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %s", resp.Status)
-	}
-
 	tmpFile, err := os.CreateTemp("", "aether-ext-*.zip")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
+	tmpName := tmpFile.Name()
 	tmpFile.Close()
+	defer os.Remove(tmpName)
 
-	return InstallFromZip(tmpFile.Name())
+	if err := netutil.DownloadFile(context.Background(), url, tmpName, nil); err != nil {
+		return fmt.Errorf("failed to download extension: %w", err)
+	}
+
+	return InstallFromZip(tmpName)
 }

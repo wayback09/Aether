@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"Aether/pkg/netutil"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"context"
 )
@@ -30,7 +31,7 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 	}
 
 	indexPath := filepath.Join(indexDir, assetIndex.ID+".json")
-	if err := e.downloadFile(assetIndex.URL, indexPath); err != nil {
+	if err := netutil.DownloadFile(ctx, assetIndex.URL, indexPath, nil); err != nil {
 		return fmt.Errorf("failed to download asset index: %w", err)
 	}
 
@@ -79,7 +80,7 @@ func (e *DownloadEngine) DownloadAssets(ctx context.Context, assetIndex AssetInd
 			defer func() { <-sem }()
 
 			url := fmt.Sprintf("https://resources.download.minecraft.net/%s/%s", h[:2], h)
-			if err := e.downloadFile(url, dest); err != nil {
+			if err := netutil.DownloadFile(ctx, url, dest, nil); err != nil {
 				errors <- fmt.Errorf("asset %s: %w", h, err)
 				return
 			}

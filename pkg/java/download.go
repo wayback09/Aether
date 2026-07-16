@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"Aether/pkg/fs"
+	"Aether/pkg/netutil"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -98,26 +99,30 @@ func DownloadJava(ctx context.Context, majorVersion int) error {
 		"total":   totalSize,
 	})
 
-	// Download to a temp file
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("aether-java-%d-*.zip", majorVersion))
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+	// Download Java with resume support and progress reporting
+	destPath := filepath.Join(os.TempDir(), fmt.Sprintf("aether-java-%d.zip", majorVersion))
+	
+	// Create progress callback
+	var lastReport int64 = 0
+	onProgress := func(downloaded, total int64) {
+		// Emit progress every ~2 MB
+		if total > 0 && downloaded-lastReport > 2*1024*1024 {
+			lastReport = downloaded
+			pct := int(downloaded * 100 / total)
+			wailsruntime.EventsEmit(ctx, "java:status", map[string]interface{}{
+				"version":  majorVersion,
+				"phase":    "downloading",
+				"message":  fmt.Sprintf("Downloading Java %d... %d%%", majorVersion, pct),
+				"progress": pct,
+				"total":    total,
+			})
+		}
 	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
 
-	dlResp, err := http.Get(downloadURL)
-	if err != nil {
-		return fmt.Errorf("failed to start download: %w", err)
+	if err := netutil.DownloadFile(ctx, downloadURL, destPath, onProgress); err != nil {
+		return fmt.Errorf("java download failed: %w", err)
 	}
-	defer dlResp.Body.Close()
-
-	// Copy with progress reporting
-	written, err := copyWithProgress(ctx, tmpFile, dlResp.Body, totalSize, majorVersion)
-	if err != nil {
-		return fmt.Errorf("download failed after %d bytes: %w", written, err)
-	}
-	tmpFile.Close()
+	defer os.Remove(destPath)
 
 	wailsruntime.EventsEmit(ctx, "java:status", map[string]interface{}{
 		"version": majorVersion,
@@ -130,7 +135,7 @@ func DownloadJava(ctx context.Context, majorVersion int) error {
 		return fmt.Errorf("failed to create runtime dir: %w", err)
 	}
 
-	if err := extractZip(tmpFile.Name(), destDir); err != nil {
+	if err := extractZip(destPath, destDir); err != nil {
 		return fmt.Errorf("failed to extract JRE: %w", err)
 	}
 
@@ -143,39 +148,6 @@ func DownloadJava(ctx context.Context, majorVersion int) error {
 	return nil
 }
 
-// copyWithProgress copies from src to dst and emits periodic progress events.
-func copyWithProgress(ctx context.Context, dst io.Writer, src io.Reader, total int64, majorVersion int) (int64, error) {
-	buf := make([]byte, 32*1024)
-	var written int64
-	for {
-		nr, err := src.Read(buf)
-		if nr > 0 {
-			nw, werr := dst.Write(buf[:nr])
-			written += int64(nw)
-			if werr != nil {
-				return written, werr
-			}
-			// Emit progress every ~2 MB
-			if total > 0 && written%(2*1024*1024) < int64(nr) {
-				pct := int(written * 100 / total)
-				wailsruntime.EventsEmit(ctx, "java:status", map[string]interface{}{
-					"version":  majorVersion,
-					"phase":    "downloading",
-					"message":  fmt.Sprintf("Downloading Java %d... %d%%", majorVersion, pct),
-					"progress": pct,
-					"total":    total,
-				})
-			}
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return written, err
-		}
-	}
-	return written, nil
-}
 
 // extractZip extracts a zip archive into destDir, stripping the top-level
 // directory that Adoptium bundles include (e.g. jdk-21.0.1-jre/).
