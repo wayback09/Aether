@@ -1,15 +1,14 @@
 # Architecture
 
 ## Backend
-The launcher backend is written in Go to ensure high performance, memory safety, and native compilation across Windows, macOS, and Linux. The backend operates completely headlessly and serves the frontend via a local JSON-RPC connection. The frontend is a lightweight web view rendering the UI.
+The launcher backend is written in Go to ensure high performance, memory safety, and native compilation across Windows, macOS, and Linux. The backend operates completely headlessly and serves the frontend via Wails bindings. The frontend is a lightweight web view rendering the UI.
 
 ## Go Packages
-- `cmd/aether`: The main entry point.
+- `main.go`: The main entry point.
 - `pkg/instance`: Logic for managing Minecraft instances, resolving dependencies, and constructing launch arguments.
 - `pkg/java`: Discovery, installation, and management of Java Runtimes (JRE/JDK).
 - `pkg/auth`: Microsoft/Xbox authentication flow and token management.
 - `pkg/extensions`: The extension manager and sandbox environment.
-- `pkg/rpc`: JSON-RPC server handling frontend and extension communication.
 
 ## Extension Manager
 The Extension Manager (`pkg/extensions`) is responsible for discovering, validating, and executing extensions. 

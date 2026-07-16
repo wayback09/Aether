@@ -1,15 +1,15 @@
 # Security
 
 ## Sandbox
-All extensions are executed inside a heavily restricted JavaScript isolate. They do not have access to the Node.js standard library, the DOM of the main launcher window, or the underlying operating system. The only way an extension can affect the outside world is via the exposed `Aether` JSON-RPC API, which validates every request.
+All extensions are executed inside a heavily restricted JavaScript isolate. They do not have access to the Node.js standard library, the DOM of the main launcher window, or the underlying operating system. The only way an extension can affect the outside world is via the exposed `Aether` API, which validates every request.
 
 ## Whitelisted Networking
 By default, extensions cannot make outbound network requests. 
-If an extension needs to communicate with an external API (e.g., Modrinth or CurseForge), it must declare the specific domains in its `manifest.json` under `hostPermissions`.
+If an extension needs to communicate with an external API (e.g., Modrinth or CurseForge), it must declare the specific domains in its `manifest.json` under `hosts`.
 The user is informed of these domains during installation.
 
 ```json
-"hostPermissions": [
+"hosts": [
   "https://api.modrinth.com/*"
 ]
 ```

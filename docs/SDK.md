@@ -30,17 +30,23 @@ declare global {
   const Aether: {
     ui: {
       registerSidebarPage(opts: { id: string; label: string; url: string }): void;
+      openDialog(opts: any): void;
     };
     instances: {
-      list(): Instance[];
-      patch(id: string, data: Partial<Instance>): void;
+      list(): { id: string; name: string; version: string; loader: string }[];
+      installMod(instanceId: string, jarName: string, downloadURL: string): string;
     };
-    storage: {
-      get(key: string): unknown;
-      set(key: string, value: unknown): void;
+    http: {
+      get(url: string): string;
     };
-    notify: {
-      show(opts: { title: string; body: string }): void;
+    fs: {
+      download(url: string, destPath: string): string;
+    };
+    launcher: {
+      registerModLoader(config: { id: string; name: string; description: string; onLaunch: (ctx: any) => any }): void;
+    };
+    skins: {
+      export(base64Data: string, filename: string): string;
     };
   };
 }
@@ -73,7 +79,6 @@ Available helpers:
 | `onReady(fn)` | Runs your function once the sandbox is fully initialised |
 | `createLogger(name)` | Returns a namespaced logger (`log.info`, `log.warn`, `log.error`) |
 | `defineProvider(spec)` | Registers a typed Loader Provider with validation |
-| `storage.get / set` | Typed wrappers around `Aether.storage` |
 | `assertPermission(perm)` | Throws a clear error if a required permission was not declared |
 
 ## Versioning

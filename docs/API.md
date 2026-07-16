@@ -6,7 +6,7 @@ Aether executes extension backend scripts inside an isolated **Goja JavaScript r
 > This backend environment is **NOT** a browser or a Node.js environment. The following APIs are unavailable:
 > - `window`
 > - `document`
-> - `fetch` (unless explicitly provided via `Aether.network.fetch`)
+> - `fetch` (unless explicitly provided via `Aether.http.get`)
 > - `localStorage`
 > - `require()`
 > - `process`, `fs`, `child_process` (and all other Node.js modules)
@@ -31,17 +31,42 @@ Allows the extension to register a frontend UI tab.
 - `Aether.ui.openDialog(options)`
 
 ### Instance Management (`instances:patch`)
-Allows the extension to programmatically modify instance JSON files. This is primarily used for installer extensions (like Fabric or Forge).
+Allows the extension to programmatically query and modify instances.
 
-- `Aether.instances.patch(instanceId, patchData)`
-  - **instanceId** (String): The ID of the instance to patch.
-  - **patchData** (Object): The JSON data to merge or inject into the instance's version manifest.
+- `Aether.instances.list()`
+  - Returns an array of objects representing all installed instances: `[{ id, name, version, loader }]`.
+- `Aether.instances.installMod(instanceId, jarName, downloadURL)`
+  - **instanceId** (String): The ID of the instance to modify.
+  - **jarName** (String): The filename to save the mod as (e.g. `fabric-api.jar`).
+  - **downloadURL** (String): The URL to download the mod from (must be allowed in `hosts`).
+
+### Mod Loader Registration (`launcher:modloader`)
+Allows the extension to register a custom mod loader that Aether can use to launch instances.
+
+- `Aether.launcher.registerModLoader(config)`
+  - **config** (Object):
+    - `id` (String): A unique identifier for the loader.
+    - `name` (String): The display name of the loader.
+    - `description` (String): A brief description of the loader.
+    - `onLaunch` (Function): A callback executed when an instance with this loader is launched.
+
+### Skin Management (`skin:export`)
+Allows the extension to write base64 encoded skins to the local filesystem.
+
+- `Aether.skins.export(base64Data, filename)`
+  - **base64Data** (String): The skin image encoded as a base64 string.
+  - **filename** (String): The name to save the skin as (e.g., `skin.png`). Returns the saved file path.
 
 ## Network Access
-By default, the backend Sandbox cannot access the network. To make HTTP requests, you must request `network:fetch` in your permissions and use the provided `Aether.network.fetch()` API (planned).
+By default, the backend Sandbox cannot access the network. To make HTTP requests, you must request `network:http` in your permissions and use the provided `Aether.http.get(url)` API.
 Direct browser `fetch()` is intentionally omitted from the backend sandbox to ensure all requests pass through Aether's domain whitelisting, logging, and rate-limiting systems.
 
 *Note: Your frontend UI (running in the iframe) CAN use Aether's provided native `fetch()` because it operates under standard web security models, but this may be restricted in the future for security reasons.*
+
+## File System Access
+By default, the backend Sandbox cannot download arbitrary files.
+- `Aether.fs.download(url, dest)` (requires `fs:download` permission)
+  - Downloads a file from the given URL (must be allowed in `hosts`) into the isolated instances/libraries folder.
 
 ## Communication with the Frontend (Iframe)
 Your frontend UI runs in an `<iframe>` served by a local HTTP server. Because it's isolated, it cannot call the `Aether` Go API directly.
@@ -81,7 +106,12 @@ Extensions must declare the `api` version they target in their `manifest.json`. 
 
 Current permissions:
 - `ui:sidebar`
+- `ui:dialogs`
 - `instances:patch`
+- `network:http`
+- `fs:download`
+- `launcher:modloader`
+- `skin:export`
 
 Future granular permissions:
 - `instances:read`, `instances:write`
@@ -89,6 +119,5 @@ Future granular permissions:
 - `launcher:launch`, `launcher:stop`
 - `downloads:start`, `downloads:cancel`
 - `notifications:show`
-- `dialogs:open`
 - `clipboard:read`, `clipboard:write`
 - `extensions:list`

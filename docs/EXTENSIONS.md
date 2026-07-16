@@ -41,7 +41,10 @@ my-extension.zip
 └── assets/
 ```
 
-**Installation**: Users can install your extension by simply dropping the `.zip` file into Aether's `Browse Extensions` page, or by placing the extracted folder directly into `%APPDATA%/Aether/extensions/`.
+**Installation**: Users can install your extension by simply dropping the `.zip` file into Aether's `Browse Extensions` page, or by placing the extracted folder directly into the Aether extensions directory:
+- **Windows**: `%APPDATA%/Aether/extensions/`
+- **macOS**: `~/Library/Application Support/Aether/extensions/`
+- **Linux**: `~/.config/Aether/extensions/`
 
 ## Manifest
 Every extension requires a `manifest.json` at its root.
@@ -165,7 +168,7 @@ Checks manifest syntax, missing files, invalid permissions, API compatibility, v
 aether build
 ```
 
-Produces a `my-extension.aex` file. Automatically minifies, compresses, validates, generates a checksum, and strips development files. The `.aex` format is Aether's first-class extension container.
+Produces a `my-extension.aex` file. Automatically minifies, compresses, validates, generates a checksum, and strips development files. The `.aex` format is Aether's planned first-class extension container. *(Currently, standard `.zip` files are used for packaging)*.
 
 ---
 
