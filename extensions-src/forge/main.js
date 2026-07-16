@@ -36,7 +36,10 @@ Aether.launcher.registerModLoader({
                         try {
                             var localPath = Aether.fs.download(lib.downloads.artifact.url, lib.downloads.artifact.path);
                             ctx.classpath.push(localPath);
-                        } catch(e) {}
+                        } catch (libErr) {
+                            // Log the failure but continue — a missing optional lib shouldn't abort the launch
+                            throw new Error("[Forge] Failed to download library " + lib.name + ": " + libErr);
+                        }
                     }
                 }
             }
@@ -48,21 +51,22 @@ Aether.launcher.registerModLoader({
             } else if (mc && mc.client) {
                 mainClass = mc.client;
             }
-        } catch(e) {
-            // If no version JSON, we still proceed with the client jar
+        } catch (jsonErr) {
+            // Version JSON not available for this Forge build — proceed with client jar only
+            throw new Error("[Forge] Could not fetch version JSON: " + jsonErr);
         }
 
-        // 4. Download the Forge client/universal jar
+        // 4. Download the Forge client jar, fall back to universal for legacy versions
+        var jarPath;
         var jarUrl = mavenUrl + basePath + "-" + jarType + ".jar";
         try {
-            var jarPath = Aether.fs.download(jarUrl, basePath + "-" + jarType + ".jar");
-            ctx.classpath.push(jarPath);
-        } catch(e) {
+            jarPath = Aether.fs.download(jarUrl, basePath + "-" + jarType + ".jar");
+        } catch (e) {
             // Fallback to universal jar for older Forge versions
             jarUrl = mavenUrl + basePath + "-universal.jar";
-            var jarPath = Aether.fs.download(jarUrl, basePath + "-universal.jar");
-            ctx.classpath.push(jarPath);
+            jarPath = Aether.fs.download(jarUrl, basePath + "-universal.jar");
         }
+        ctx.classpath.push(jarPath);
 
         ctx.mainClass = mainClass;
         return ctx;
