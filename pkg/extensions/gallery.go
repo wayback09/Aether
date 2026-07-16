@@ -75,7 +75,8 @@ func DownloadAndInstallExtension(url string) error {
 	}
 	tmpName := tmpFile.Name()
 	tmpFile.Close()
-	defer os.Remove(tmpName)
+	os.Remove(tmpName) // remove the 0-byte file so DownloadFile doesn't skip it
+	defer os.Remove(tmpName) // clean up the downloaded file after installation
 
 	if err := netutil.DownloadFile(context.Background(), url, tmpName, nil); err != nil {
 		return fmt.Errorf("failed to download extension: %w", err)

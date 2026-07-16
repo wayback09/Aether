@@ -3,6 +3,7 @@
   import TitleBar from './components/TitleBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import CommandPalette from './components/CommandPalette.svelte';
+  import ToastContainer from './components/ToastContainer.svelte';
   import Home from './pages/Home.svelte';
   import Instances from './pages/Instances.svelte';
   import Extensions from './pages/Extensions.svelte';
@@ -108,6 +109,9 @@
 
   <!-- Command Palette — rendered above everything -->
   <CommandPalette bind:open={paletteOpen} {commands} on:close={() => (paletteOpen = false)} />
+
+  <!-- Global Toasts -->
+  <ToastContainer />
 </div>
 
 <style>

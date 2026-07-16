@@ -1,0 +1,20 @@
+{
+  "id": "skin-maker",
+  "name": "Skin Maker & Viewer",
+  "version": "1.0.0",
+  "author": "Aether",
+  "description": "View any player's skin in 3D and paint directly on the model",
+  "icon": "icon.png",
+  "main": "main.js",
+  "api": "1.0",
+  "permissions": [
+    "ui:sidebar",
+    "network:http",
+    "skin:export"
+  ],
+  "hosts": [
+    "namemc.com",
+    "api.namemc.com",
+    "textures.minecraft.net"
+  ]
+}

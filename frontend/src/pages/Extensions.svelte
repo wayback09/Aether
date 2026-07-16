@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { GetExtensions, SelectAndInstallExtension, DownloadAndInstallExtension } from '../../wailsjs/go/main/App.js';
   import EmptyState from '../components/EmptyState.svelte';
+  import { toast } from '../stores/toast';
 
   let installedExtensions: any[] = [];
   let galleryExtensions: any[] = [];
@@ -47,8 +48,9 @@
         await loadInstalled();
         activeTab = 'installed';
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Installation failed:', e);
+      toast.error('Installation failed: ' + e);
     } finally {
       isInstalling = false;
     }
@@ -64,10 +66,11 @@
       if (installed) {
         await loadInstalled();
         activeTab = 'installed';
+        toast.success('Extension installed successfully!');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Remote installation failed:', e);
-      alert('Failed to install extension: ' + e);
+      toast.error('Failed to install extension: ' + e);
     } finally {
       isInstalling = false;
       installingId = '';

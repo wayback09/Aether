@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skin Maker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="viewer">Viewer</button>
+  <button class="tab-btn" data-tab="maker">Maker</button>
+</div>
+
+<div id="tab-viewer" class="tab-content active">
+  <div class="search-bar">
+    <input type="text" id="username-input" placeholder="Enter Minecraft username..." />
+    <button id="search-btn">Load Skin</button>
+  </div>
+  <div class="model-container" id="viewer-3d"></div>
+  <div class="viewer-controls">
+    <p id="viewer-status">Enter a username to view their skin</p>
+    <div class="viewer-actions">
+      <button id="rotate-btn" class="btn-sm active">Auto-Rotate</button>
+      <button id="slim-btn" class="btn-sm">Slim (Alex)</button>
+    </div>
+  </div>
+</div>
+
+<div id="tab-maker" class="tab-content">
+  <div class="maker-layout">
+    <div class="maker-3d-wrap">
+      <div class="model-container" id="maker-3d"></div>
+    </div>
+    <div class="maker-panel">
+      <div class="panel-section">
+        <h3>Colors</h3>
+        <div class="color-grid" id="color-grid"></div>
+        <div class="custom-color-row">
+          <input type="color" id="custom-color" value="#d4a574" />
+          <button id="apply-custom">Apply</button>
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>Selected</h3>
+        <p id="selected-info">Click on the model</p>
+        <div class="part-buttons" id="part-buttons"></div>
+        <button id="fill-part-btn" class="btn-primary">Fill Part</button>
+        <button id="fill-face-btn" class="btn-secondary">Fill Face Only</button>
+      </div>
+      <div class="panel-section">
+        <h3>Actions</h3>
+        <button id="export-btn" class="btn-primary">Export PNG</button>
+        <button id="import-editor-btn" class="btn-secondary">Import from Username</button>
+        <button id="clear-skin-btn" class="btn-danger">New Skin</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script src="core.js"></script>
+<script src="viewer.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

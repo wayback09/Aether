@@ -3,6 +3,7 @@
   import { GetInstances, GetAvailableVersions, CreateInstance, GetModLoaders } from '../../wailsjs/go/main/App.js';
   import Dropdown from '../components/Dropdown.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import { toast } from '../stores/toast';
 
   const dispatch = createEventDispatcher();
 
@@ -42,9 +43,10 @@
       newInstance.loader = "Vanilla";
       // Navigate straight to home with the new instance selected
       dispatch('navigate', `home:instance:${created.id}`);
-    } catch (err) {
+      toast.success("Instance created successfully!");
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to create instance: " + err);
+      toast.error("Failed to create instance: " + err);
     } finally {
       isCreating = false;
     }
