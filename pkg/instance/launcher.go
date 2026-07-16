@@ -237,10 +237,7 @@ func buildClasspath(instanceDir string, info *mojang.VersionInfo) string {
 		if lib.Downloads.Artifact.Path == "" {
 			continue
 		}
-		// Skip native-only jars from classpath (they're extracted separately)
-		if strings.Contains(lib.Name, "natives-") {
-			continue
-		}
+		
 		libPath := filepath.Join(instanceDir, "libraries", lib.Downloads.Artifact.Path)
 		if _, err := os.Stat(libPath); err == nil {
 			paths = append(paths, libPath)
