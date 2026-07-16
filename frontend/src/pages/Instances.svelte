@@ -13,18 +13,23 @@
   let availableVersions: string[] = [];
   let availableLoaders: any[] = [];
   let isCreating = false;
+  let includeSnapshots = false;
 
   async function loadInstances() {
     const res = await GetInstances();
     instances = res || [];
   }
 
-  onMount(async () => {
-    await loadInstances();
-    availableVersions = await GetAvailableVersions();
-    if (availableVersions.length > 0) {
+  async function loadVersions() {
+    availableVersions = await GetAvailableVersions(includeSnapshots);
+    if (availableVersions.length > 0 && (!newInstance.version || !availableVersions.includes(newInstance.version))) {
       newInstance.version = availableVersions[0];
     }
+  }
+
+  onMount(async () => {
+    await loadInstances();
+    await loadVersions();
     
     const loaders = await GetModLoaders();
     availableLoaders = [
@@ -109,7 +114,16 @@
 
         <div class="form-group">
           <!-- svelte-ignore a11y-label-has-associated-control -->
-          <label>Version</label>
+          <div class="version-header">
+            <label>Version</label>
+            <label class="switch-wrapper">
+              <span class="switch-label">Snapshots</span>
+              <div class="switch">
+                <input type="checkbox" bind:checked={includeSnapshots} on:change={loadVersions} />
+                <span class="slider"></span>
+              </div>
+            </label>
+          </div>
           <Dropdown 
             options={availableVersions.map(v => ({ label: v, value: v }))} 
             bind:value={newInstance.version} 
@@ -267,5 +281,66 @@
     justify-content: flex-end;
     gap: var(--spacing-md);
     margin-top: var(--spacing-sm);
+  }
+
+  .version-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .switch-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 32px;
+    height: 18px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255,255,255,0.1);
+    transition: .3s;
+    border-radius: 18px;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--text-meta);
+    transition: .3s;
+    border-radius: 50%;
+  }
+
+  input:checked + .slider {
+    background-color: var(--accent);
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(14px);
+    background-color: white;
   }
 </style>

@@ -275,20 +275,20 @@ func (a *App) InstallInstance(id string) error {
 	return nil
 }
 
-// GetAvailableVersions fetches stable releases from Mojang
-func (a *App) GetAvailableVersions() ([]string, error) {
+// GetAvailableVersions fetches releases from Mojang
+func (a *App) GetAvailableVersions(includeSnapshots bool) ([]string, error) {
 	manifest, err := mojang.GetVersionManifest()
 	if err != nil {
 		return nil, err
 	}
 
-	var releases []string
+	var versions []string
 	for _, v := range manifest.Versions {
-		if v.Type == "release" {
-			releases = append(releases, v.ID)
+		if v.Type == "release" || (includeSnapshots && v.Type == "snapshot") {
+			versions = append(versions, v.ID)
 		}
 	}
-	return releases, nil
+	return versions, nil
 }
 
 // CreateInstance creates a new instance on disk and returns the created instance
