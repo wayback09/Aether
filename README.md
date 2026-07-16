@@ -1,6 +1,10 @@
 # Aether Launcher
 
 <p align="center">
+  <img src="frontend/public/logo.png" alt="Aether Logo" width="120" />
+</p>
+
+<p align="center">
   <em>A minimal, extensible, lightning-fast Minecraft launcher.</em>
 </p>
 
