@@ -194,40 +194,27 @@ func (a *App) RemoveAccount(id string) error {
 	return auth.RemoveAccount(id)
 }
 
-// LoginWithMicrosoft starts the OAuth2 flow and returns immediately.
-func (a *App) LoginWithMicrosoft() error {
-	go func() {
-		var browserPort int
-		
-		// Start local callback server for OAuth loop.
-		// Blocks until completion, but triggers callback once listening.
-		code, err := auth.StartCallbackServer(func(port int) {
-			browserPort = port
-			url := auth.GetMicrosoftAuthURL(port)
-			runtime.BrowserOpenURL(a.ctx, url)
-		})
-		
-		if err != nil {
-			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
-			return
-		}
+// StartMicrosoftAuth initiates the device code flow and returns the code and instructions.
+func (a *App) StartMicrosoftAuth() (*auth.DeviceCodeResponse, error) {
+	return auth.GetDeviceCode()
+}
 
-		// Exchange authorization code for token chain.
-		acc, err := auth.LoginWithMicrosoft(code, browserPort)
-		if err != nil {
-			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
-			return
-		}
+// PollMicrosoftAuth blocks until the device code flow completes, then saves the account.
+func (a *App) PollMicrosoftAuth(deviceCode string, interval int) error {
+	msToken, msRefresh, err := auth.PollForToken(deviceCode, interval)
+	if err != nil {
+		return err
+	}
 
-		// Save to keyring and set as active profile.
-		if err := auth.AddMicrosoftAccount(acc); err != nil {
-			runtime.EventsEmit(a.ctx, "auth:error", err.Error())
-			return
-		}
+	acc, err := auth.LoginWithMicrosoft(msToken, msRefresh)
+	if err != nil {
+		return err
+	}
 
-		// Notify frontend of successful authentication.
-		runtime.EventsEmit(a.ctx, "auth:complete")
-	}()
+	if err := auth.AddMicrosoftAccount(acc); err != nil {
+		return err
+	}
+
 	return nil
 }
 

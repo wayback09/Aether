@@ -8,33 +8,97 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Microsoft OAuth2 client ID shared by third-party Minecraft launchers (Xbox app client)
 const msClientID = "00000000402b5328"
 
-// GetMicrosoftAuthURL returns the URL to open in the browser to begin Microsoft login.
-func GetMicrosoftAuthURL(redirectPort int) string {
-	redirectURI := fmt.Sprintf("http://localhost:%d/callback", redirectPort)
-	params := url.Values{}
-	params.Set("client_id", msClientID)
-	params.Set("response_type", "code")
-	params.Set("redirect_uri", redirectURI)
-	params.Set("scope", "XboxLive.signin offline_access")
-	params.Set("prompt", "select_account")
-	return "https://login.live.com/oauth20_authorize.srf?" + params.Encode()
+type DeviceCodeResponse struct {
+	UserCode        string `json:"user_code"`
+	DeviceCode      string `json:"device_code"`
+	VerificationURI string `json:"verification_uri"`
+	ExpiresIn       int    `json:"expires_in"`
+	Interval        int    `json:"interval"`
+	Message         string `json:"message"`
 }
 
-// LoginWithMicrosoft runs the full 6-step token chain and returns a fully-populated Account.
-func LoginWithMicrosoft(authCode string, redirectPort int) (Account, error) {
-	redirectURI := fmt.Sprintf("http://localhost:%d/callback", redirectPort)
+// GetDeviceCode initiates the Microsoft device code flow.
+func GetDeviceCode() (*DeviceCodeResponse, error) {
+	body := url.Values{}
+	body.Set("client_id", msClientID)
+	body.Set("scope", "XboxLive.signin offline_access")
 
-	// Step 2: Exchange auth code for Microsoft access token
-	msToken, msRefresh, err := getMicrosoftToken(authCode, redirectURI)
+	resp, err := http.PostForm("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode", body)
 	if err != nil {
-		return Account{}, fmt.Errorf("MS token exchange failed: %w", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to request device code: %s", string(raw))
 	}
 
+	var result DeviceCodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// PollForToken repeatedly checks if the user has completed the device code login.
+func PollForToken(deviceCode string, intervalSeconds int) (accessToken, refreshToken string, err error) {
+	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
+	defer ticker.Stop()
+	
+	// Timeout after 15 minutes (max for device code flow)
+	timeout := time.After(15 * time.Minute)
+
+	for {
+		select {
+		case <-timeout:
+			return "", "", fmt.Errorf("authentication timed out")
+		case <-ticker.C:
+			body := url.Values{}
+			body.Set("client_id", msClientID)
+			body.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+			body.Set("device_code", deviceCode)
+
+			resp, err := http.PostForm("https://login.microsoftonline.com/consumers/oauth2/v2.0/token", body)
+			if err != nil {
+				return "", "", err
+			}
+
+			var result struct {
+				Error        string `json:"error"`
+				ErrorDesc    string `json:"error_description"`
+				AccessToken  string `json:"access_token"`
+				RefreshToken string `json:"refresh_token"`
+			}
+
+			rawBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			if err := json.Unmarshal(rawBody, &result); err != nil {
+				return "", "", fmt.Errorf("failed to parse MS token response: %w", err)
+			}
+
+			if result.Error == "authorization_pending" {
+				continue // Still waiting
+			}
+
+			if result.Error != "" {
+				return "", "", fmt.Errorf("%s: %s", result.Error, result.ErrorDesc)
+			}
+
+			return result.AccessToken, result.RefreshToken, nil
+		}
+	}
+}
+
+// LoginWithMicrosoft runs the full 5-step token chain using a fresh Microsoft access token.
+func LoginWithMicrosoft(msToken, msRefresh string) (Account, error) {
 	// Step 3: Authenticate with Xbox Live
 	xblToken, userHash, err := getXboxLiveToken(msToken)
 	if err != nil {
@@ -69,7 +133,6 @@ func LoginWithMicrosoft(authCode string, redirectPort int) (Account, error) {
 }
 
 // RefreshMicrosoftToken silently refreshes the Microsoft access token using the stored refresh token.
-// Returns the updated Account if successful.
 func RefreshMicrosoftToken(acc *Account) (*Account, error) {
 	if acc.RefreshToken == "" {
 		return nil, fmt.Errorf("no refresh token stored for account %s", acc.Username)
@@ -99,7 +162,7 @@ func RefreshMicrosoftToken(acc *Account) (*Account, error) {
 		return nil, fmt.Errorf("refresh failed: %s", result.Error)
 	}
 
-	// Re-run the XBL → XSTS → MC chain with the new MS token
+	// Re-run the XBL -> XSTS -> MC chain with the new MS token
 	xblToken, userHash, err := getXboxLiveToken(result.AccessToken)
 	if err != nil {
 		return nil, err
@@ -118,43 +181,13 @@ func RefreshMicrosoftToken(acc *Account) (*Account, error) {
 	return acc, nil
 }
 
-// getMicrosoftToken exchanges an auth code for a Microsoft access + refresh token pair.
-func getMicrosoftToken(code, redirectURI string) (accessToken, refreshToken string, err error) {
-	body := url.Values{}
-	body.Set("client_id", msClientID)
-	body.Set("code", code)
-	body.Set("grant_type", "authorization_code")
-	body.Set("redirect_uri", redirectURI)
-
-	resp, err := http.PostForm("https://login.live.com/oauth20_token.srf", body)
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		Error        string `json:"error"`
-		ErrorDesc    string `json:"error_description"`
-	}
-	rawBody, _ := io.ReadAll(resp.Body)
-	if err := json.Unmarshal(rawBody, &result); err != nil {
-		return "", "", fmt.Errorf("failed to parse MS token response: %w", err)
-	}
-	if result.Error != "" {
-		return "", "", fmt.Errorf("%s: %s", result.Error, result.ErrorDesc)
-	}
-	return result.AccessToken, result.RefreshToken, nil
-}
-
 // getXboxLiveToken exchanges a Microsoft access token for an Xbox Live token.
 func getXboxLiveToken(msAccessToken string) (xblToken, userHash string, err error) {
 	payload := map[string]interface{}{
 		"Properties": map[string]interface{}{
 			"AuthMethod": "RPS",
 			"SiteName":   "user.auth.xboxlive.com",
-			"RpsTicket":  msAccessToken,
+			"RpsTicket":  "d=" + msAccessToken, // Important prefix for modern MS tokens in Minecraft API
 		},
 		"RelyingParty": "http://auth.xboxlive.com",
 		"TokenType":    "JWT",
@@ -213,7 +246,6 @@ func getXSTSToken(xblToken string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// XSTS can return an error body even on non-200 status
 	rawBody, _ := io.ReadAll(resp.Body)
 
 	var result struct {
@@ -287,7 +319,6 @@ func getMinecraftProfile(mcToken string) (uuid, username string, err error) {
 		return "", "", err
 	}
 
-	// Format UUID with dashes: 8-4-4-4-12
 	raw := profile.ID
 	if len(raw) == 32 {
 		uuid = strings.Join([]string{raw[0:8], raw[8:12], raw[12:16], raw[16:20], raw[20:32]}, "-")
