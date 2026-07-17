@@ -59,6 +59,10 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install pkg-config
 
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        run: choco install nsis --no-progress -y
+
       # Windows: build with --nsis to produce an installer
       - name: Build (Windows)
         if: runner.os == 'Windows'
