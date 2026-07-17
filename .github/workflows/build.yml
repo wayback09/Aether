@@ -16,8 +16,8 @@ jobs:
         include:
           - os: windows-latest
             platform: windows/amd64
-            binary: Aether.exe
-            asset: Aether-windows-amd64.exe
+            installer: Aether-amd64-installer.exe
+            asset: Aether-windows-amd64-installer.exe
 
           - os: macos-14
             platform: darwin/arm64
@@ -59,20 +59,29 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install pkg-config
 
-      - name: Build
+      # Windows: build with --nsis to produce an installer
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: wails build -platform ${{ matrix.platform }} --nsis
+
+      - name: Build (non-Windows)
+        if: runner.os != 'Windows'
         run: wails build -platform ${{ matrix.platform }}
 
+      # Windows: rename installer
+      - name: Rename Windows installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv "build/bin/${{ matrix.installer }}" "${{ matrix.asset }}"
+
+      # macOS: zip the .app bundle
       - name: Package macOS app
         if: runner.os == 'macOS'
         run: |
           cd build/bin
-          zip -r ../../${{ matrix.asset }} ${{ matrix.binary }}
+          zip -r "${{ github.workspace }}/${{ matrix.asset }}" "${{ matrix.binary }}"
 
-      - name: Rename Windows binary
-        if: runner.os == 'Windows'
-        shell: bash
-        run: mv build/bin/${{ matrix.binary }} ${{ matrix.asset }}
-
+      # Linux: rename binary
       - name: Rename Linux binary
         if: runner.os == 'Linux'
         run: mv build/bin/${{ matrix.binary }} ${{ matrix.asset }}
@@ -98,21 +107,31 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: "Aether ${{ github.ref_name }}"
-          prerelease: true
+          prerelease: false
           body: |
             ## Aether ${{ github.ref_name }}
 
-            - Instance creation and management for Vanilla Minecraft
+            ### What's included
+            - Instance creation and management with Vanilla, Fabric, and NeoForge support
+            - Snapshot version toggle — switch between stable releases and latest snapshots
             - Automatic Java detection across JAVA_HOME and PATH
             - Mojang asset, library, and client JAR download pipeline
             - Sandboxed JavaScript extension runtime (Goja)
             - Extension Gallery with live registry fetch from GitHub
             - Trust tiers: Official, Verified, Community, Local
             - 1-click extension install from the in-app gallery
-            - Fabric mod loader via extension
             - Modrinth mod browser via extension
             - Extension sidebar pages rendered in isolated iframes
             - Command Palette (Ctrl+Shift+P)
-            - Windows, macOS (Apple Silicon), and Linux builds
-            - Intel Mac support coming in a future release
+            - Custom in-app toast notifications (no browser popups)
+            - Windows installer (NSIS), macOS (Apple Silicon), and Linux builds
+
+            ### Downloads
+            | Platform | File |
+            |---|---|
+            | Windows (x64) | `Aether-windows-amd64-installer.exe` |
+            | macOS (Apple Silicon) | `Aether-macos-arm64.zip` |
+            | Linux (x64) | `Aether-linux-amd64` |
+
+            > Intel Mac support coming in a future release.
           files: artifacts/*
