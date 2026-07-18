@@ -1,8 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { LoginOffline, StartMicrosoftAuth, PollMicrosoftAuth } from '../../wailsjs/go/main/App';
-  import { BrowserOpenURL } from '../../wailsjs/runtime/runtime';
-  import type { auth } from '../../wailsjs/go/models';
+  import { LoginOffline } from '../../wailsjs/go/main/App';
 
   export let showModal = false;
 
@@ -10,53 +8,8 @@
 
   let username = '';
   let isLoading = false;
-  let isMsLoading = false;
   let errorMsg = '';
   
-  let deviceCodeInfo: auth.DeviceCodeResponse | null = null;
-  let copyText = 'Copy';
-
-  async function handleMicrosoftLogin() {
-    isMsLoading = true;
-    errorMsg = '';
-    try {
-      deviceCodeInfo = await StartMicrosoftAuth();
-      
-      // We don't await Poll here because we want the UI to update to show the code.
-      // We'll handle the polling result in a background promise.
-      PollMicrosoftAuth(deviceCodeInfo.device_code, deviceCodeInfo.interval)
-        .then(() => {
-          showModal = false;
-          dispatch('login_ms');
-        })
-        .catch(err => {
-          errorMsg = err.toString();
-        })
-        .finally(() => {
-          isMsLoading = false;
-          deviceCodeInfo = null;
-        });
-
-    } catch (err) {
-      errorMsg = err.toString();
-      isMsLoading = false;
-    }
-  }
-
-  function copyCode() {
-    if (deviceCodeInfo) {
-      navigator.clipboard.writeText(deviceCodeInfo.user_code);
-      copyText = 'Copied!';
-      setTimeout(() => copyText = 'Copy', 2000);
-    }
-  }
-
-  function openLink() {
-    if (deviceCodeInfo) {
-      BrowserOpenURL(deviceCodeInfo.verification_uri);
-    }
-  }
-
   async function handleLogin() {
     if (!username.trim()) {
       errorMsg = 'Username cannot be empty';
@@ -80,79 +33,48 @@
 </script>
 
 {#if showModal}
-  <div class="modal-backdrop" on:click={() => { if(!deviceCodeInfo) showModal = false; }} on:keydown={(e) => e.key === 'Escape' && !deviceCodeInfo && (showModal = false)} role="button" tabindex="0">
+  <div class="modal-backdrop" on:click={() => { showModal = false; }} on:keydown={(e) => e.key === 'Escape' && (showModal = false)} role="button" tabindex="0">
     <div class="modal" on:click|stopPropagation on:keydown|stopPropagation role="button" tabindex="0">
       
-      {#if deviceCodeInfo}
-        <h2>Microsoft Sign In</h2>
-        <p class="subtitle">Please complete the sign in using your browser.</p>
+      <h2>Sign In</h2>
+      <p class="subtitle">Log in to play Minecraft.</p>
+      
+      <button class="btn primary btn-microsoft" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 21 21">
+          <rect x="1" y="1" width="9" height="9" fill="#f35325"/>
+          <rect x="11" y="1" width="9" height="9" fill="#81bc06"/>
+          <rect x="1" y="11" width="9" height="9" fill="#05a6f0"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffba08"/>
+        </svg>
+        Coming soon
+      </button>
 
-        <div class="device-code-container">
-          <p>1. Copy this code:</p>
-          <div class="code-box">
-            <span class="code">{deviceCodeInfo.user_code}</span>
-            <button class="btn secondary copy-btn" on:click={copyCode}>{copyText}</button>
-          </div>
-          
-          <p>2. Open the link below and paste the code:</p>
-          <button class="btn primary link-btn" on:click={openLink}>
-            Open {deviceCodeInfo.verification_uri}
-          </button>
-        </div>
+      <div class="divider">
+        <span>or</span>
+      </div>
 
-        <div class="spinner-container">
-          <div class="spinner"></div>
-          <span>Waiting for authorization...</span>
-        </div>
-
+      <div class="form-group">
+        <label for="username">Offline Username</label>
+        <input 
+          id="username"
+          type="text" 
+          bind:value={username} 
+          placeholder="e.g. Notch" 
+          on:keydown={(e) => e.key === 'Enter' && handleLogin()}
+          disabled={isLoading}
+        />
         {#if errorMsg}
           <span class="error">{errorMsg}</span>
         {/if}
+      </div>
 
-        <div class="modal-actions" style="margin-top: 24px;">
-          <button class="btn secondary" on:click={() => { showModal = false; deviceCodeInfo = null; isMsLoading = false; }}>Cancel</button>
-        </div>
-
-      {:else}
-        <h2>Sign In</h2>
-        <p class="subtitle">Log in to play Minecraft.</p>
-        
-        <button class="btn primary btn-microsoft" on:click={handleMicrosoftLogin} disabled={isMsLoading || isLoading}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 21 21">
-            <rect x="1" y="1" width="9" height="9" fill="#f35325"/>
-            <rect x="11" y="1" width="9" height="9" fill="#81bc06"/>
-            <rect x="1" y="11" width="9" height="9" fill="#05a6f0"/>
-            <rect x="11" y="11" width="9" height="9" fill="#ffba08"/>
-          </svg>
-          {isMsLoading ? 'Initiating...' : 'Sign in with Microsoft'}
+      <div class="modal-actions">
+        <button class="btn secondary" on:click={() => showModal = false} disabled={isLoading}>Cancel</button>
+        <button class="btn primary" on:click={handleLogin} disabled={isLoading || !username.trim()}>
+          {isLoading ? 'Logging in...' : 'Offline Login'}
         </button>
+      </div>
 
-        <div class="divider">
-          <span>or</span>
-        </div>
-
-        <div class="form-group">
-          <label for="username">Offline Username</label>
-          <input 
-            id="username"
-            type="text" 
-            bind:value={username} 
-            placeholder="e.g. Notch" 
-            on:keydown={(e) => e.key === 'Enter' && handleLogin()}
-            disabled={isMsLoading || isLoading}
-          />
-          {#if errorMsg}
-            <span class="error">{errorMsg}</span>
-          {/if}
-        </div>
-
-        <div class="modal-actions">
-          <button class="btn secondary" on:click={() => showModal = false} disabled={isMsLoading || isLoading}>Cancel</button>
-          <button class="btn primary" on:click={handleLogin} disabled={isMsLoading || isLoading || !username.trim()}>
-            {isLoading ? 'Logging in...' : 'Offline Login'}
-          </button>
-        </div>
-      {/if}
     </div>
   </div>
 {/if}

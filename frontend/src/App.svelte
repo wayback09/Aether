@@ -9,11 +9,12 @@
   import Extensions from './pages/Extensions.svelte';
   import ExtensionView from './pages/ExtensionView.svelte';
   import InstanceDetails from './pages/InstanceDetails.svelte';
+  import Settings from './pages/Settings.svelte';
 
   let activePage = 'home';
   let targetInstanceId = '';
   let activeInstanceId = '';
-  let extensionRoutes: Record<string, string> = {};
+  let extensionRoutes: Record<string, { url: string; extensionId: string }> = {};
   let paletteOpen = false;
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -36,8 +37,8 @@
     }
   }
 
-  function handleRegisterExtensionRoute(event: CustomEvent<{ id: string; url: string }>) {
-    extensionRoutes[event.detail.id] = event.detail.url;
+  function handleRegisterExtensionRoute(event: CustomEvent<{ id: string; url: string; extensionId: string }>) {
+    extensionRoutes[event.detail.id] = { url: event.detail.url, extensionId: event.detail.extensionId };
   }
 
   // ── Command Palette ──────────────────────────────────────────────────────────
@@ -96,8 +97,10 @@
         <InstanceDetails instanceId={targetInstanceId} on:navigate={handleNavigate} />
       {:else if activePage === 'extensions'}
         <Extensions />
+      {:else if activePage === 'settings'}
+        <Settings />
       {:else if extensionRoutes[activePage]}
-        <ExtensionView url={extensionRoutes[activePage]} extID={activePage} />
+        <ExtensionView url={extensionRoutes[activePage].url} extID={extensionRoutes[activePage].extensionId} />
       {:else}
         <div class="placeholder">
           <h2>{activePage.charAt(0).toUpperCase() + activePage.slice(1)}</h2>

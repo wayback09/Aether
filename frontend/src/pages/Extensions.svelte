@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { GetExtensions, SelectAndInstallExtension, DownloadAndInstallExtension } from '../../wailsjs/go/main/App.js';
+  import { GetExtensions, SelectAndInstallExtension, DownloadAndInstallExtension, GetSettings } from '../../wailsjs/go/main/App.js';
   import EmptyState from '../components/EmptyState.svelte';
   import { toast } from '../stores/toast';
 
@@ -14,10 +14,13 @@
   // Real GitHub URL for the Aether Extension Registry
   const GALLERY_INDEX_URL = 'https://raw.githubusercontent.com/wayback09/Aether-Extensions/main/index.json';
 
+  let isDevMode = false;
+
   async function loadInstalled() {
     try {
-      const exts = await GetExtensions();
+      const [exts, sets] = await Promise.all([GetExtensions(), GetSettings()]);
       installedExtensions = exts || [];
+      isDevMode = sets.developerMode;
     } catch (e) {
       console.error(e);
     }
@@ -166,6 +169,9 @@
                   </div>
                   <div class="ext-meta">
                     <span class="ext-author">by {ext.author}</span>
+                    {#if isDevMode}
+                      <span class="dev-id" title="Extension ID">id: {ext.id}</span>
+                    {/if}
                   </div>
                 </div>
               </div>
@@ -176,6 +182,13 @@
                 <div class="ext-status-wrap">
                   <div class="ext-status-dot" style="background: {dot}; box-shadow: 0 0 6px {dot};"></div>
                   <span class="ext-status-text">{ext.status || 'Active'}</span>
+                  {#if isDevMode && ext.status === 'Running'}
+                    <div class="dev-stats">
+                      <span title="Memory Usage">{ext.memory || '0MB'}</span>
+                      <span class="dot-separator">•</span>
+                      <span title="CPU Usage">{ext.cpu || '0%'} cpu</span>
+                    </div>
+                  {/if}
                 </div>
                 <!-- TODO: Settings / Uninstall buttons -->
               </div>
@@ -467,4 +480,33 @@
   .badge-verified  { background: rgba(16, 185, 129, 0.15);  color: #34d399;  border: 1px solid rgba(16, 185, 129, 0.35);  }
   .badge-community { background: rgba(168, 85, 247, 0.12);  color: #c084fc;  border: 1px solid rgba(168, 85, 247, 0.3);   }
   .badge-local     { background: rgba(245, 158, 11, 0.12);  color: #fbbf24;  border: 1px solid rgba(245, 158, 11, 0.3);   }
+
+  /* Dev Mode Styles */
+  .dev-id {
+    font-family: monospace;
+    font-size: 11px;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #a78bfa;
+    margin-left: 8px;
+  }
+
+  .dev-stats {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 11px;
+    font-family: monospace;
+    color: #94a3b8;
+    background: rgba(0,0,0,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .dot-separator {
+    color: rgba(255,255,255,0.2);
+  }
 </style>

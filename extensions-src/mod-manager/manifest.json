@@ -1,0 +1,14 @@
+{
+  "id": "mod-manager",
+  "name": "Mod Manager",
+  "version": "1.0.0",
+  "author": "Aether",
+  "description": "Manage mods for all your instances.",
+  "icon": "icon.png",
+  "main": "main.js",
+  "api": "1.0",
+  "permissions": [
+    "ui:sidebar",
+    "instances:patch"
+  ]
+}

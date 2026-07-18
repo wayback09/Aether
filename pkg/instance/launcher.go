@@ -14,6 +14,7 @@ import (
 	"Aether/pkg/fs"
 	"Aether/pkg/java"
 	"Aether/pkg/mojang"
+	"Aether/pkg/settings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -79,10 +80,6 @@ func Launch(ctx context.Context, inst *Instance) error {
 	if activeAccount != nil {
 		username = activeAccount.Username
 		uuid = activeAccount.ID
-		if activeAccount.Type == auth.TypeMicrosoft {
-			accessToken = activeAccount.AccessToken
-			userType = "msa"
-		}
 	}
 
 	vars := map[string]string{
@@ -143,11 +140,20 @@ func Launch(ctx context.Context, inst *Instance) error {
 	jvmArgs := mojang.ResolveArguments(versionInfo.Arguments.JVM)
 	jvmArgs = substituteVars(jvmArgs, vars)
 
+	// Load global settings for fallbacks
+	globalSettings := settings.Load()
+
 	// Add memory flags
 	memory := inst.Memory
-	if memory == "" {
-		memory = "4G"
+	if memory == "" || memory == "Default" {
+		memory = globalSettings.DefaultMemory
 	}
+	
+	// If memory string doesn't specify M or G (like "4096"), append M
+	if !strings.HasSuffix(strings.ToUpper(memory), "M") && !strings.HasSuffix(strings.ToUpper(memory), "G") {
+		memory += "M"
+	}
+
 	jvmArgs = append([]string{"-Xmx" + memory, "-Xms512M"}, jvmArgs...)
 
 	// Add log4j config if available
@@ -192,6 +198,10 @@ func Launch(ctx context.Context, inst *Instance) error {
 		"state": "Running",
 	})
 
+	if globalSettings.CloseOnLaunch {
+		runtime.WindowHide(ctx)
+	}
+
 	// Async log readers
 	go func() {
 		scanner := bufio.NewScanner(stdout)
@@ -217,6 +227,11 @@ func Launch(ctx context.Context, inst *Instance) error {
 			state = "Crashed"
 			fmt.Printf("[Launcher] Minecraft exited with error: %v\n", err)
 		}
+		
+		if globalSettings.CloseOnLaunch {
+			runtime.WindowShow(ctx)
+		}
+
 		runtime.EventsEmit(ctx, "instance:state", map[string]interface{}{
 			"id":    inst.ID,
 			"state": state,

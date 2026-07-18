@@ -7,7 +7,7 @@ The launcher backend is written in Go to ensure high performance, memory safety,
 - `main.go`: The main entry point.
 - `pkg/instance`: Logic for managing Minecraft instances, resolving dependencies, and constructing launch arguments.
 - `pkg/java`: Discovery, installation, and management of Java Runtimes (JRE/JDK).
-- `pkg/auth`: Microsoft/Xbox authentication flow and token management.
+- `pkg/auth`: Offline player authentication and token management.
 - `pkg/extensions`: The extension manager and sandbox environment.
 
 ## Extension Manager
@@ -22,7 +22,7 @@ The updater is built into the core launcher but operates independently.
 ## Launcher Pipeline
 1. **Resolution**: Determine the Minecraft version, loader (Fabric, Forge, etc.), and required libraries.
 2. **Verification**: Check if all assets, libraries, and the Java runtime are present. Download missing files.
-3. **Authentication**: Ensure the user has a valid session token. Refresh if necessary.
+3. **Authentication**: Ensure the offline session token is populated.
 4. **Execution**: Construct the massive Java command line and spawn the child process.
 5. **Monitoring**: Pipe standard output/error to the log manager and monitor the process state.
 

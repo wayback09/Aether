@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>All Permissions Example</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background-color: #2e3440; /* Dark background */
+      color: #d8dee9; /* Light text */
+    }
+    h1 {
+      color: #81a1c1; /* Accent color */
+    }
+    button {
+      padding: 10px 15px;
+      margin-top: 10px;
+      background-color: #5e81ac; /* Button color */
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #81a1c1;
+    }
+    pre {
+      background-color: #3b4252;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin-top: 15px;
+    }
+    code {
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>All Permissions Example Extension</h1>
+  <p>This extension demonstrates the usage of various Aether APIs and permissions.</p>
+
+  <p>Check the developer console (usually accessible via browser dev tools if the frontend is running in a browser-like environment, or via Aether's console output) for logs and results from the API calls.</p>
+
+  <button onclick="logMessages()">Log Console Messages</button>
+  <p><em>(Check the console for API call results)</em></p>
+
+  <div id="output"></div>
+
+  <script>
+    // Basic function to show messages in the UI (optional)
+    function logMessages() {
+      const outputDiv = document.getElementById('output');
+      outputDiv.innerHTML = '<p>Check the console for detailed logs.</p>';
+      // You could potentially push console logs to this div if needed,
+      // but for API results, the console is the primary place.
+    }
+
+    // You can add more interactive elements here if needed,
+    // but the core logic is in main.js.
+  </script>
+</body>
+</html>

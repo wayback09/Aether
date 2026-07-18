@@ -19,7 +19,7 @@
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
-  type ExtensionTab = { id: string; label: string; url: string; icon?: string };
+  type ExtensionTab = { id: string; label: string; url: string; icon?: string; extensionId: string };
   let extensionTabs: ExtensionTab[] = [];
 
   onMount(async () => {

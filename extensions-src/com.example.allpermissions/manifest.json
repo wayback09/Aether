@@ -1,0 +1,21 @@
+{
+  "id": "com.example.allpermissions",
+  "name": "All Permissions Example",
+  "version": "1.0.0",
+  "author": "AI Assistant",
+  "description": "An example extension demonstrating all available Aether API permissions.",
+  "api": "1.0.0",
+  "main": "main.js",
+  "homepage": "https://example.com/aether-extensions",
+  "repository": "https://github.com/example/aether-extensions",
+  "license": "MIT",
+  "permissions": [
+    "ui:sidebar",
+    "ui:dialogs",
+    "instances:patch",
+    "launcher:modloader",
+    "skin:export",
+    "network:http",
+    "fs:download"
+  ]
+}

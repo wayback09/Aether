@@ -35,7 +35,6 @@ Every privileged operation is strictly mediated by the launcher. Extensions expl
 - Execute arbitrary shell commands (e.g., via `os/exec`).
 - Access the filesystem directly (they can only use scoped `Aether.fs` APIs).
 - Read launcher memory.
-- Access Microsoft authentication tokens.
 - Access another extension's data.
 - Escape the Goja sandbox (which has zero bindings by default).
 - Access Go APIs directly.

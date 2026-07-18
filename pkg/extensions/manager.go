@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"Aether/pkg/fs"
 	"Aether/pkg/instance"
@@ -148,6 +149,52 @@ func (m *Manager) LoadAll() error {
 						return "", err
 					}
 					return destPath, nil
+				},
+				func(instanceID string) ([]string, error) {
+					modsDir := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods")
+					entries, err := os.ReadDir(modsDir)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return []string{}, nil
+						}
+						return nil, err
+					}
+					var mods []string
+					for _, e := range entries {
+						if !e.IsDir() {
+							mods = append(mods, e.Name())
+						}
+					}
+					return mods, nil
+				},
+				func(instanceID, jarName string) error {
+					jarName = filepath.Base(jarName)
+					modPath := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods", jarName)
+					return os.Remove(modPath)
+				},
+				func(instanceID, jarName string, enable bool) error {
+					jarName = filepath.Base(jarName)
+					modsDir := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods")
+					
+					currentPath := filepath.Join(modsDir, jarName)
+					
+					if enable {
+						// We want to enable it. It must currently end in .disabled
+						if strings.HasSuffix(jarName, ".disabled") {
+							newPath := filepath.Join(modsDir, strings.TrimSuffix(jarName, ".disabled"))
+							return os.Rename(currentPath, newPath)
+						}
+						// Already enabled
+						return nil
+					} else {
+						// We want to disable it.
+						if !strings.HasSuffix(jarName, ".disabled") {
+							newPath := filepath.Join(modsDir, jarName+".disabled")
+							return os.Rename(currentPath, newPath)
+						}
+						// Already disabled
+						return nil
+					}
 				},
 				runtime.EventsEmit,
 			)

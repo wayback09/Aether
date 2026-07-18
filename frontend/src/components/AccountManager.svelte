@@ -38,7 +38,7 @@
     <div class="details">
       {#if activeAccount}
         <span class="username">{activeAccount.username}</span>
-        <span class="status">{activeAccount.type === 'microsoft' ? 'Microsoft Account' : 'Offline Account'}</span>
+        <span class="status">Offline Account</span>
       {:else}
         <span class="username">Guest</span>
         <span class="status">Offline</span>

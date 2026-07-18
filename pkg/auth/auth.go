@@ -15,7 +15,6 @@ type AccountType string
 
 const (
 	TypeOffline   AccountType = "offline"
-	TypeMicrosoft AccountType = "microsoft"
 )
 
 // Account represents a user profile
@@ -100,25 +99,6 @@ func AddOfflineAccount(username string) (Account, error) {
 	return newAcc, err
 }
 
-// AddMicrosoftAccount saves a Microsoft account and sets it as active
-func AddMicrosoftAccount(acc Account) error {
-	if err := LoadAccounts(); err != nil {
-		return err
-	}
-
-	// Replace if exists
-	for i, existing := range store.Accounts {
-		if existing.ID == acc.ID {
-			store.Accounts[i] = acc
-			store.ActiveAccountID = acc.ID
-			return SaveAccounts()
-		}
-	}
-
-	store.Accounts = append(store.Accounts, acc)
-	store.ActiveAccountID = acc.ID
-	return SaveAccounts()
-}
 
 // RemoveAccount removes an account by ID
 func RemoveAccount(id string) error {

@@ -13,6 +13,7 @@ import (
 	"Aether/pkg/instance"
 	"Aether/pkg/java"
 	"Aether/pkg/mojang"
+	"Aether/pkg/settings"
 )
 
 type App struct {
@@ -30,18 +31,32 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	fs.EnsureDirectories()
 	
-	// Initialize and load all extensions into their isolates
-	extensions.GlobalManager = extensions.NewManager(ctx)
-	extensions.GlobalManager.LoadAll()
+	globalSettings := settings.Load()
 
-	// Wire the mod loader hook so launcher.go can call extension mod loaders
-	// without an import cycle (instance → extensions → instance)
-	instance.ModLoaderHook = func(loaderID string, hookCtx map[string]interface{}) (map[string]interface{}, error) {
-		if loader, ok := extensions.GlobalManager.ModLoaders[loaderID]; ok {
-			return loader.Callback(hookCtx)
+	if !globalSettings.DisableExtensions {
+		// Initialize and load all extensions into their isolates
+		extensions.GlobalManager = extensions.NewManager(ctx)
+		extensions.GlobalManager.LoadAll()
+
+		// Wire the mod loader hook so launcher.go can call extension mod loaders
+		// without an import cycle (instance → extensions → instance)
+		instance.ModLoaderHook = func(loaderID string, hookCtx map[string]interface{}) (map[string]interface{}, error) {
+			if loader, ok := extensions.GlobalManager.ModLoaders[loaderID]; ok {
+				return loader.Callback(hookCtx)
+			}
+			return nil, fmt.Errorf("mod loader '%s' is not installed", loaderID)
 		}
-		return nil, fmt.Errorf("mod loader '%s' is not installed", loaderID)
 	}
+}
+
+// GetSettings returns the global launcher settings
+func (a *App) GetSettings() settings.GlobalSettings {
+	return settings.Load()
+}
+
+// SaveSettings updates the global launcher settings
+func (a *App) SaveSettings(s settings.GlobalSettings) error {
+	return settings.Save(s)
 }
 
 // GetInstances returns all installed instances
@@ -192,30 +207,6 @@ func (a *App) SetActiveAccount(id string) error {
 // RemoveAccount removes an account by ID
 func (a *App) RemoveAccount(id string) error {
 	return auth.RemoveAccount(id)
-}
-
-// StartMicrosoftAuth initiates the device code flow and returns the code and instructions.
-func (a *App) StartMicrosoftAuth() (*auth.DeviceCodeResponse, error) {
-	return auth.GetDeviceCode()
-}
-
-// PollMicrosoftAuth blocks until the device code flow completes, then saves the account.
-func (a *App) PollMicrosoftAuth(deviceCode string, interval int) error {
-	msToken, msRefresh, err := auth.PollForToken(deviceCode, interval)
-	if err != nil {
-		return err
-	}
-
-	acc, err := auth.LoginWithMicrosoft(msToken, msRefresh)
-	if err != nil {
-		return err
-	}
-
-	if err := auth.AddMicrosoftAccount(acc); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // LaunchInstance starts the specified instance

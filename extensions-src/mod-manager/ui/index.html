@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mod Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Use Phosphor Icons for the trash icon -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Mod Manager</h1>
+                <p>Manage your installed mods locally</p>
+            </div>
+            <div class="instance-selector">
+                <label for="instances">Select Instance:</label>
+                <select id="instances">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+        </header>
+
+        <main>
+            <div id="loading" class="state-message">Loading instances...</div>
+            <div id="empty-state" class="state-message hidden">No mods found for this instance.</div>
+            
+            <div class="mods-container">
+                <!-- Mod rows will be injected here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Template for a mod row -->
+    <template id="mod-row-template">
+        <div class="mod-row">
+            <div class="mod-info">
+                <div class="mod-icon">
+                    <i class="ph-fill ph-file-zip"></i>
+                </div>
+                <div class="mod-details">
+                    <h3 class="mod-name">Mod Name</h3>
+                    <span class="mod-filename">filename.jar</span>
+                </div>
+            </div>
+            <div class="mod-actions">
+                <label class="switch">
+                    <input type="checkbox" class="mod-toggle">
+                    <span class="slider round"></span>
+                </label>
+                <button class="delete-btn" title="Delete Mod">
+                    <i class="ph ph-trash"></i>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <script src="app.js"></script>
+</body>
+</html>

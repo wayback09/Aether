@@ -39,6 +39,14 @@ Allows the extension to programmatically query and modify instances.
   - **instanceId** (String): The ID of the instance to modify.
   - **jarName** (String): The filename to save the mod as (e.g. `fabric-api.jar`).
   - **downloadURL** (String): The URL to download the mod from (must be allowed in `hosts`).
+- `Aether.instances.listMods(instanceId)`
+  - **instanceId** (String): The ID of the instance.
+  - Returns an array of strings representing the filenames in the `mods` folder.
+- `Aether.instances.deleteMod(instanceId, jarName)`
+  - Deletes the specified mod file from the instance.
+- `Aether.instances.toggleMod(instanceId, jarName, enable)`
+  - **enable** (Boolean): True to enable, false to disable.
+  - Disabling a mod renames it to `.jar.disabled`. Enabling it renames it back to `.jar`.
 
 ### Mod Loader Registration (`launcher:modloader`)
 Allows the extension to register a custom mod loader that Aether can use to launch instances.
@@ -71,7 +79,43 @@ By default, the backend Sandbox cannot download arbitrary files.
 ## Communication with the Frontend (Iframe)
 Your frontend UI runs in an `<iframe>` served by a local HTTP server. Because it's isolated, it cannot call the `Aether` Go API directly.
 
-If your UI needs to trigger a backend sandbox action (e.g., downloading a mod directly to the instance folder), you will use the upcoming IPC bridge (planned for a future update), which will allow `postMessage` communication between the Iframe and the Goja Sandbox.
+To communicate between your UI and the backend Goja sandbox, use the built-in IPC bridge.
+
+### 1. In your Backend Script (`main.js`)
+You can register a listener using `Aether.ui.onMessage`. Any data returned by this function is automatically sent back to the frontend UI as a response. You can also push messages down to the frontend UI without a prompt using `Aether.ui.postMessage`.
+
+```javascript
+// Listen for messages from the frontend
+Aether.ui.onMessage((payload) => {
+    if (payload.action === 'download_mod') {
+        const path = Aether.instances.installMod(payload.instanceId, payload.jarName, payload.url);
+        return { status: 'success', path: path }; // Sent back to frontend
+    }
+});
+
+// Push a message to the frontend unconditionally
+Aether.ui.postMessage({ type: 'download_progress', percent: 50 });
+```
+
+### 2. In your Frontend UI (`index.html`)
+Because the frontend runs in an isolated `<iframe>`, you use standard Web APIs (`window.postMessage`) to talk to the bridge, and listen for responses via `window.addEventListener('message')`.
+
+```javascript
+// Send a message to your backend script
+window.parent.postMessage({
+    action: 'download_mod',
+    instanceId: 'fabric-1.20',
+    jarName: 'my-mod.jar',
+    url: 'https://example.com/mod.jar'
+}, '*');
+
+// Listen for responses or pushed messages from the backend script
+window.addEventListener('message', (event) => {
+    if (event.data.status === 'success') {
+        console.log("Mod downloaded to: ", event.data.path);
+    }
+});
+```
 
 ## Lifecycle
 

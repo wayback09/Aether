@@ -42,6 +42,9 @@ func NewSandbox(
 	onModLoader func(ModLoaderConfig),
 	listInstances func() []InstanceInfo,
 	installMod func(instanceID, jarName, downloadURL string) (string, error),
+	listMods func(instanceID string) ([]string, error),
+	deleteMod func(instanceID, jarName string) error,
+	toggleMod func(instanceID, jarName string, enable bool) error,
 	emit func(ctx context.Context, event string, data ...interface{}),
 ) *Sandbox {
 	if emit == nil {
@@ -190,6 +193,43 @@ func NewSandbox(
 				panic(vm.NewGoError(err))
 			}
 			return vm.ToValue(path)
+		})
+
+		instancesObj.Set("listMods", func(call goja.FunctionCall) goja.Value {
+			instanceID := call.Argument(0).String()
+			if listMods == nil {
+				panic(vm.NewGoError(fmt.Errorf("listMods not available")))
+			}
+			mods, err := listMods(instanceID)
+			if err != nil {
+				panic(vm.NewGoError(err))
+			}
+			return vm.ToValue(mods)
+		})
+
+		instancesObj.Set("deleteMod", func(call goja.FunctionCall) goja.Value {
+			instanceID := call.Argument(0).String()
+			jarName := call.Argument(1).String()
+			if deleteMod == nil {
+				panic(vm.NewGoError(fmt.Errorf("deleteMod not available")))
+			}
+			if err := deleteMod(instanceID, jarName); err != nil {
+				panic(vm.NewGoError(err))
+			}
+			return goja.Undefined()
+		})
+
+		instancesObj.Set("toggleMod", func(call goja.FunctionCall) goja.Value {
+			instanceID := call.Argument(0).String()
+			jarName := call.Argument(1).String()
+			enable := call.Argument(2).ToBoolean()
+			if toggleMod == nil {
+				panic(vm.NewGoError(fmt.Errorf("toggleMod not available")))
+			}
+			if err := toggleMod(instanceID, jarName, enable); err != nil {
+				panic(vm.NewGoError(err))
+			}
+			return goja.Undefined()
 		})
 
 		aetherObj.Set("instances", instancesObj)
