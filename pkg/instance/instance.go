@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"Aether/pkg/fs"
 )
@@ -28,26 +29,45 @@ func GetInstances() []Instance {
 		return instances
 	}
 
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if !entry.IsDir() {
+			continue
+		}
+
+		wg.Add(1)
+		go func(entry os.DirEntry) {
+			defer wg.Done()
+
 			manifestPath := filepath.Join(instancesDir, entry.Name(), "instance.json")
 			data, err := os.ReadFile(manifestPath)
-			if err == nil {
-				var inst Instance
-				if err := json.Unmarshal(data, &inst); err == nil {
-					if inst.ID == "" {
-						inst.ID = entry.Name()
-					}
-					// Check if client.jar exists
-					jarPath := filepath.Join(instancesDir, entry.Name(), "bin", inst.Version+".jar")
-					if _, err := os.Stat(jarPath); err == nil {
-						inst.Installed = true
-					}
-					instances = append(instances, inst)
-				}
+			if err != nil {
+				return
 			}
-		}
+
+			var inst Instance
+			if err := json.Unmarshal(data, &inst); err != nil {
+				return
+			}
+
+			if inst.ID == "" {
+				inst.ID = entry.Name()
+			}
+			// Check if client.jar exists
+			jarPath := filepath.Join(instancesDir, entry.Name(), "bin", inst.Version+".jar")
+			if _, err := os.Stat(jarPath); err == nil {
+				inst.Installed = true
+			}
+
+			mu.Lock()
+			instances = append(instances, inst)
+			mu.Unlock()
+		}(entry)
 	}
+
+	wg.Wait()
 	return instances
 }
 
