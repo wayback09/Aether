@@ -114,7 +114,7 @@ func StartPKCEAuthFlow(ctx context.Context) (*Account, error) {
 	defer listener.Close()
 
 	port := listener.Addr().(*net.TCPAddr).Port
-	redirectURI := fmt.Sprintf("http://localhost:%d/callback", port)
+	redirectURI := fmt.Sprintf("http://localhost:%d", port)
 
 	verifier, err := generateCodeVerifier()
 	if err != nil {
@@ -134,8 +134,8 @@ func StartPKCEAuthFlow(ctx context.Context) (*Account, error) {
 	codeChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
-	server := &http.Server{}
-	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		errStr := r.URL.Query().Get("error")
 
@@ -158,6 +158,8 @@ func StartPKCEAuthFlow(ctx context.Context) (*Account, error) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "Invalid callback request")
 	})
+
+	server := &http.Server{Handler: mux}
 
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
