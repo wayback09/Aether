@@ -1,0 +1,9 @@
+{
+  "name": "com.example.allpermissions",
+  "version": "1.0.0",
+  "description": "All permissions test extension",
+  "main": "main.js",
+  "devDependencies": {
+    "@aether/sdk": "file:../../../Aether-SDK"
+  }
+}

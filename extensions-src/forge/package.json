@@ -1,0 +1,9 @@
+{
+  "name": "forge",
+  "version": "1.0.0",
+  "description": "Forge Mod Loader",
+  "main": "main.js",
+  "devDependencies": {
+    "@aether/sdk": "file:../../../Aether-SDK"
+  }
+}

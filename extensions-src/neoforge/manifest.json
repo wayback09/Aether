@@ -6,6 +6,7 @@
   "description": "Adds support for launching the NeoForge mod loader.",
   "icon": "icon.png",
   "main": "main.js",
+  "api": "1.0",
   "permissions": [
     "launcher:modloader",
     "network:http",

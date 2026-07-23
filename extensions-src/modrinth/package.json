@@ -1,0 +1,9 @@
+{
+  "name": "modrinth",
+  "version": "1.2.0",
+  "description": "Modrinth Browser",
+  "main": "main.js",
+  "devDependencies": {
+    "@aether/sdk": "file:../../../Aether-SDK"
+  }
+}

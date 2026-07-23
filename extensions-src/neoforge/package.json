@@ -1,0 +1,9 @@
+{
+  "name": "neoforge",
+  "version": "1.0.0",
+  "description": "NeoForge Mod Loader",
+  "main": "main.js",
+  "devDependencies": {
+    "@aether/sdk": "file:../../../Aether-SDK"
+  }
+}

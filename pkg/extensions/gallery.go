@@ -67,9 +67,9 @@ func GetGalleryExtensions() []GalleryExtension {
 	return galleryCache
 }
 
-// DownloadAndInstallExtension downloads a zip file from a trusted Registry URL and installs it.
+// DownloadAndInstallExtension downloads an extension package from a trusted Registry URL and installs it.
 func DownloadAndInstallExtension(url string) error {
-	tmpFile, err := os.CreateTemp("", "aether-ext-*.zip")
+	tmpFile, err := os.CreateTemp("", "aether-ext-*.aex")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -82,5 +82,5 @@ func DownloadAndInstallExtension(url string) error {
 		return fmt.Errorf("failed to download extension: %w", err)
 	}
 
-	return InstallFromZip(tmpName)
+	return InstallFromArchive(tmpName)
 }

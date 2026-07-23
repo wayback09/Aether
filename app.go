@@ -154,11 +154,11 @@ func (a *App) DownloadJavaRuntime(version int) error {
 
 func (a *App) SelectAndInstallExtension() (bool, error) {
 	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Select Extension Zip",
+		Title: "Select Extension Package",
 		Filters: []runtime.FileFilter{
 			{
-				DisplayName: "Aether Extensions (*.zip)",
-				Pattern:     "*.zip",
+				DisplayName: "Aether Extensions (*.aex)",
+				Pattern:     "*.aex",
 			},
 		},
 	})
@@ -170,7 +170,7 @@ func (a *App) SelectAndInstallExtension() (bool, error) {
 		return false, nil
 	}
 
-	if err := extensions.InstallFromZip(file); err != nil {
+	if err := extensions.InstallFromArchive(file); err != nil {
 		return false, err
 	}
 

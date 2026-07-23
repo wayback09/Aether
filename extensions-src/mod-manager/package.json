@@ -1,0 +1,9 @@
+{
+  "name": "mod-manager",
+  "version": "1.0.0",
+  "description": "Mod Manager",
+  "main": "main.js",
+  "devDependencies": {
+    "@aether/sdk": "file:../../../Aether-SDK"
+  }
+}

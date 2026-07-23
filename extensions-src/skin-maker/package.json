@@ -1,0 +1,9 @@
+{
+  "name": "skin-maker",
+  "version": "1.0.0",
+  "description": "Skin Maker",
+  "main": "main.js",
+  "devDependencies": {
+    "@aether/sdk": "file:../../../Aether-SDK"
+  }
+}

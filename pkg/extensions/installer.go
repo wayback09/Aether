@@ -12,9 +12,9 @@ import (
 	"Aether/pkg/fs"
 )
 
-// InstallFromZip extracts a zip file to a temporary location, validates the manifest,
-// and moves it to the extensions directory under its ID.
-func InstallFromZip(zipPath string) error {
+// InstallFromArchive extracts an extension archive (.aex/.zip) to a temporary location,
+// validates the manifest, and moves it to the extensions directory under its ID.
+func InstallFromArchive(archivePath string) error {
 	extDir := filepath.Join(fs.GetDataDir(), "extensions")
 	if err := os.MkdirAll(extDir, 0755); err != nil {
 		return err
@@ -26,9 +26,9 @@ func InstallFromZip(zipPath string) error {
 	}
 	defer os.RemoveAll(tempDir) // Clean up temp dir in case of failure
 
-	r, err := zip.OpenReader(zipPath)
+	r, err := zip.OpenReader(archivePath)
 	if err != nil {
-		return fmt.Errorf("failed to open zip: %w", err)
+		return fmt.Errorf("failed to open archive: %w", err)
 	}
 	defer r.Close()
 
