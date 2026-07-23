@@ -20,7 +20,7 @@ Every feature that is not essential to launching the game—like downloading mod
 - **Minimalist UI**: Clean, native-feeling, elegant design that gets out of your way, complete with smooth custom toast notifications.
 - **Snapshot Support**: Effortlessly toggle between stable releases and latest snapshots when creating instances.
 - **Extensible Architecture**: Everything from Modrinth integration to server browsers is an extension.
-- **Secure Sandbox**: Extensions run in a strict capability-based JavaScript isolate to protect your session tokens and your operating system.
+- **Capability-Based Extensions**: Extension backend code runs in a restricted Goja runtime and can only use the launcher APIs granted by its manifest permissions.
 
 ## Documentation
 
@@ -28,7 +28,7 @@ All project documentation is located in the `docs/` directory. If you are lookin
 
 - **[Project Philosophy & Design](docs/DESIGN.md)** - The core principles guiding Aether's development.
 - **[Architecture](docs/ARCHITECTURE.md)** - Overview of the Go backend, Extension Manager, and launcher pipeline.
-- **[API & Interoperability](docs/API.md)** - Details on the JSON-RPC endpoints and permission model.
+- **[API & Interoperability](docs/API.md)** - Details on the extension API and permission model.
 - **[Extensions Guide](docs/EXTENSIONS.md)** - How to build, package, and publish extensions for Aether.
   - *Looking for the official extension registry? Visit the [Aether-Extensions](https://github.com/wayback09/Aether-Extensions) repository.*
 - **[Security & Sandboxing](docs/SECURITY.md)** - Threat models, capability isolation, and review guidelines.

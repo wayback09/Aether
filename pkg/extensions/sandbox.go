@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,10 +18,10 @@ import (
 
 // Sandbox represents an isolated JavaScript environment for an extension
 type Sandbox struct {
-	ctx                context.Context
-	vm                 *goja.Runtime
-	manifest           Manifest
-	onMessageCallback  func(map[string]interface{}) (map[string]interface{}, error)
+	ctx               context.Context
+	vm                *goja.Runtime
+	manifest          Manifest
+	onMessageCallback func(map[string]interface{}) (map[string]interface{}, error)
 }
 
 // InstanceInfo is a minimal view of an instance passed into the sandbox
@@ -30,6 +31,8 @@ type InstanceInfo struct {
 	Version string
 	Loader  string
 }
+
+const maxExtensionHTTPResponse = 10 * 1024 * 1024
 
 // NewSandbox creates a new Goja isolate restricted by the given manifest.
 // emit is an optional function for broadcasting events (e.g. runtime.EventsEmit);
@@ -46,20 +49,31 @@ func NewSandbox(
 	deleteMod func(instanceID, jarName string) error,
 	toggleMod func(instanceID, jarName string, enable bool) error,
 	emit func(ctx context.Context, event string, data ...interface{}),
+	confirm func(action map[string]interface{}) bool,
 ) *Sandbox {
 	if emit == nil {
 		emit = func(_ context.Context, _ string, _ ...interface{}) {}
 	}
 	vm := goja.New()
-	
+
 	// Create the secure Aether bridge object
 	aetherObj := vm.NewObject()
-	
+
 	// URL Whitelist Helper
 	isAllowedURL := func(target string) bool {
-		// Example implementation (simplified)
-		for _, host := range manifest.Hosts {
-			if strings.Contains(target, host) {
+		parsed, err := url.Parse(target)
+		if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+			return false
+		}
+		requestedHost := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+		for _, allowed := range manifest.Hosts {
+			allowedURL, err := url.Parse(allowed)
+			allowedHost := allowed
+			if err == nil && allowedURL.Hostname() != "" {
+				allowedHost = allowedURL.Hostname()
+			}
+			allowedHost = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(allowedHost, ".")))
+			if allowedHost != "" && (requestedHost == allowedHost || strings.HasSuffix(requestedHost, "."+allowedHost)) {
 				return true
 			}
 		}
@@ -72,22 +86,22 @@ func NewSandbox(
 		uiObj.Set("registerSidebarPage", func(call goja.FunctionCall) goja.Value {
 			if len(call.Arguments) > 0 {
 				arg := call.Argument(0).Export().(map[string]interface{})
-				
+
 				// Reconstruct the URL using the local server
 				relURL := arg["url"].(string)
 				fullURL := fmt.Sprintf("%s/%s/%s", serverURL, manifest.ID, relURL)
-				
+
 				payload := map[string]interface{}{
 					"extensionId": manifest.ID,
 					"id":          arg["id"],
 					"label":       arg["label"],
 					"url":         fullURL,
 				}
-				
+
 				if onSidebarPage != nil {
 					onSidebarPage(payload)
 				}
-				
+
 				emit(ctx, "extension:sidebar:add", payload)
 			}
 			return goja.Undefined()
@@ -107,7 +121,7 @@ func NewSandbox(
 			return goja.Undefined()
 		})
 	}
-	
+
 	// Capability: network:http
 	if manifest.HasPermission("network:http") {
 		httpObj := vm.NewObject()
@@ -116,36 +130,49 @@ func NewSandbox(
 			if !isAllowedURL(targetURL) {
 				panic(vm.NewGoError(fmt.Errorf("access denied to URL: %s", targetURL)))
 			}
-			
-			resp, err := http.Get(targetURL)
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+			if err != nil {
+				panic(vm.NewGoError(err))
+			}
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				panic(vm.NewGoError(err))
 			}
 			defer resp.Body.Close()
-			
-			body, err := io.ReadAll(resp.Body)
+			if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+				panic(vm.NewGoError(fmt.Errorf("HTTP request failed with status %s", resp.Status)))
+			}
+
+			body, err := io.ReadAll(io.LimitReader(resp.Body, maxExtensionHTTPResponse+1))
 			if err != nil {
 				panic(vm.NewGoError(err))
+			}
+			if len(body) > maxExtensionHTTPResponse {
+				panic(vm.NewGoError(fmt.Errorf("HTTP response exceeds %d bytes", maxExtensionHTTPResponse)))
 			}
 			return vm.ToValue(string(body))
 		})
 		aetherObj.Set("http", httpObj)
 	}
-	
+
 	// Capability: fs:download
 	if manifest.HasPermission("fs:download") {
 		fsObj := vm.NewObject()
 		fsObj.Set("download", func(call goja.FunctionCall) goja.Value {
 			targetURL := call.Argument(0).String()
 			destPath := call.Argument(1).String()
-			
+
 			if !isAllowedURL(targetURL) {
 				panic(vm.NewGoError(fmt.Errorf("access denied to URL: %s", targetURL)))
 			}
-			
+
 			// Force destPath to be within the instances/libraries folder
-			safePath := filepath.Join(fs.GetDataDir(), "libraries", filepath.Clean(destPath))
-			
+			safePath, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "libraries"), destPath)
+			if err != nil {
+				panic(vm.NewGoError(err))
+			}
+
 			if err := netutil.DownloadFile(ctx, targetURL, safePath, nil); err != nil {
 				panic(vm.NewGoError(err))
 			}
@@ -153,84 +180,124 @@ func NewSandbox(
 		})
 		aetherObj.Set("fs", fsObj)
 	}
-	
-	// Capability: instances:patch
-	if manifest.HasPermission("instances:patch") {
+
+	// Instance and mod capabilities are independently controlled. The legacy
+	// instances:patch permission is accepted by HasAnyPermission for migration.
+	if manifest.HasAnyPermission("instances:list", "mods:list", "mods:install", "mods:delete", "mods:toggle") {
 		instancesObj := vm.NewObject()
 
-		instancesObj.Set("list", func(call goja.FunctionCall) goja.Value {
-			if listInstances == nil {
-				return vm.ToValue([]interface{}{})
-			}
-			all := listInstances()
-			var result []map[string]interface{}
-			for _, inst := range all {
-				result = append(result, map[string]interface{}{
-					"id":      inst.ID,
-					"name":    inst.Name,
-					"version": inst.Version,
-					"loader":  inst.Loader,
-				})
-			}
-			return vm.ToValue(result)
-		})
+		if manifest.HasAnyPermission("instances:list") {
+			instancesObj.Set("list", func(call goja.FunctionCall) goja.Value {
+				if listInstances == nil {
+					return vm.ToValue([]interface{}{})
+				}
+				all := listInstances()
+				var result []map[string]interface{}
+				for _, inst := range all {
+					result = append(result, map[string]interface{}{
+						"id":      inst.ID,
+						"name":    inst.Name,
+						"version": inst.Version,
+						"loader":  inst.Loader,
+					})
+				}
+				return vm.ToValue(result)
+			})
+		}
 
-		instancesObj.Set("installMod", func(call goja.FunctionCall) goja.Value {
-			instanceID := call.Argument(0).String()
-			jarName := call.Argument(1).String()
-			downloadURL := call.Argument(2).String()
+		if manifest.HasAnyPermission("mods:install") {
+			instancesObj.Set("installMod", func(call goja.FunctionCall) goja.Value {
+				instanceID := call.Argument(0).String()
+				jarName := call.Argument(1).String()
+				downloadURL := call.Argument(2).String()
 
-			if !isAllowedURL(downloadURL) {
-				panic(vm.NewGoError(fmt.Errorf("access denied to URL: %s", downloadURL)))
-			}
+				if !isAllowedURL(downloadURL) {
+					panic(vm.NewGoError(fmt.Errorf("access denied to URL: %s", downloadURL)))
+				}
 
-			if installMod == nil {
-				panic(vm.NewGoError(fmt.Errorf("installMod not available")))
-			}
+				if installMod == nil {
+					panic(vm.NewGoError(fmt.Errorf("installMod not available")))
+				}
+				if confirm != nil && !confirm(map[string]interface{}{
+					"action":        "install mod",
+					"extensionId":   manifest.ID,
+					"extensionName": manifest.Name,
+					"instanceId":    instanceID,
+					"jarName":       jarName,
+					"url":           downloadURL,
+				}) {
+					panic(vm.NewGoError(fmt.Errorf("user denied mod installation")))
+				}
 
-			path, err := installMod(instanceID, jarName, downloadURL)
-			if err != nil {
-				panic(vm.NewGoError(err))
-			}
-			return vm.ToValue(path)
-		})
+				path, err := installMod(instanceID, jarName, downloadURL)
+				if err != nil {
+					panic(vm.NewGoError(err))
+				}
+				return vm.ToValue(path)
+			})
+		}
 
-		instancesObj.Set("listMods", func(call goja.FunctionCall) goja.Value {
-			instanceID := call.Argument(0).String()
-			if listMods == nil {
-				panic(vm.NewGoError(fmt.Errorf("listMods not available")))
-			}
-			mods, err := listMods(instanceID)
-			if err != nil {
-				panic(vm.NewGoError(err))
-			}
-			return vm.ToValue(mods)
-		})
+		if manifest.HasAnyPermission("mods:list") {
+			instancesObj.Set("listMods", func(call goja.FunctionCall) goja.Value {
+				instanceID := call.Argument(0).String()
+				if listMods == nil {
+					panic(vm.NewGoError(fmt.Errorf("listMods not available")))
+				}
+				mods, err := listMods(instanceID)
+				if err != nil {
+					panic(vm.NewGoError(err))
+				}
+				return vm.ToValue(mods)
+			})
+		}
 
-		instancesObj.Set("deleteMod", func(call goja.FunctionCall) goja.Value {
-			instanceID := call.Argument(0).String()
-			jarName := call.Argument(1).String()
-			if deleteMod == nil {
-				panic(vm.NewGoError(fmt.Errorf("deleteMod not available")))
-			}
-			if err := deleteMod(instanceID, jarName); err != nil {
-				panic(vm.NewGoError(err))
-			}
-			return goja.Undefined()
-		})
+		if manifest.HasAnyPermission("mods:delete") {
+			instancesObj.Set("deleteMod", func(call goja.FunctionCall) goja.Value {
+				instanceID := call.Argument(0).String()
+				jarName := call.Argument(1).String()
+				if deleteMod == nil {
+					panic(vm.NewGoError(fmt.Errorf("deleteMod not available")))
+				}
+				if confirm != nil && !confirm(map[string]interface{}{
+					"action":        "delete mod",
+					"extensionId":   manifest.ID,
+					"extensionName": manifest.Name,
+					"instanceId":    instanceID,
+					"jarName":       jarName,
+				}) {
+					panic(vm.NewGoError(fmt.Errorf("user denied mod deletion")))
+				}
+				if err := deleteMod(instanceID, jarName); err != nil {
+					panic(vm.NewGoError(err))
+				}
+				return goja.Undefined()
+			})
+		}
 
-		instancesObj.Set("toggleMod", func(call goja.FunctionCall) goja.Value {
-			instanceID := call.Argument(0).String()
-			jarName := call.Argument(1).String()
-			enable := call.Argument(2).ToBoolean()
-			if toggleMod == nil {
-				panic(vm.NewGoError(fmt.Errorf("toggleMod not available")))
-			}
-			if err := toggleMod(instanceID, jarName, enable); err != nil {
-				panic(vm.NewGoError(err))
-			}
-			return goja.Undefined()
-		})
+		if manifest.HasAnyPermission("mods:toggle") {
+			instancesObj.Set("toggleMod", func(call goja.FunctionCall) goja.Value {
+				instanceID := call.Argument(0).String()
+				jarName := call.Argument(1).String()
+				enable := call.Argument(2).ToBoolean()
+				if toggleMod == nil {
+					panic(vm.NewGoError(fmt.Errorf("toggleMod not available")))
+				}
+				if confirm != nil && !confirm(map[string]interface{}{
+					"action":        "change mod state",
+					"extensionId":   manifest.ID,
+					"extensionName": manifest.Name,
+					"instanceId":    instanceID,
+					"jarName":       jarName,
+					"enable":        enable,
+				}) {
+					panic(vm.NewGoError(fmt.Errorf("user denied mod state change")))
+				}
+				if err := toggleMod(instanceID, jarName, enable); err != nil {
+					panic(vm.NewGoError(err))
+				}
+				return goja.Undefined()
+			})
+		}
 
 		aetherObj.Set("instances", instancesObj)
 	}
@@ -241,14 +308,14 @@ func NewSandbox(
 		launcherObj.Set("registerModLoader", func(call goja.FunctionCall) goja.Value {
 			if len(call.Arguments) > 0 {
 				arg := call.Argument(0).Export().(map[string]interface{})
-				
+
 				config := ModLoaderConfig{
 					ID:          arg["id"].(string),
 					Name:        arg["name"].(string),
 					Description: arg["description"].(string),
 					ExtensionID: manifest.ID,
 				}
-				
+
 				// Extract the JS callback function safely
 				if cb, ok := goja.AssertFunction(call.Argument(0).ToObject(vm).Get("onLaunch")); ok {
 					config.Callback = func(ctx map[string]interface{}) (map[string]interface{}, error) {
@@ -259,7 +326,7 @@ func NewSandbox(
 						return val.Export().(map[string]interface{}), nil
 					}
 				}
-				
+
 				if onModLoader != nil {
 					onModLoader(config)
 				}
@@ -285,7 +352,10 @@ func NewSandbox(
 				panic(vm.NewGoError(err))
 			}
 
-			safePath := filepath.Join(skinsDir, filepath.Clean(filename))
+			safePath, err := fs.ContainedPath(skinsDir, filename)
+			if err != nil {
+				panic(vm.NewGoError(err))
+			}
 			data, err := base64.StdEncoding.DecodeString(b64Data)
 			if err != nil {
 				panic(vm.NewGoError(fmt.Errorf("invalid base64 data: %w", err)))
@@ -304,7 +374,7 @@ func NewSandbox(
 	if manifest.HasPermission("ui:sidebar") {
 		// Grab the existing uiObj that was created earlier (or create if somehow nil)
 		uiIPC := vm.NewObject()
-		
+
 		// Sandbox not yet created. Store callback via pointer closure to allow
 		// execution later.
 		var jsMessageHandler goja.Callable

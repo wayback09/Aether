@@ -11,7 +11,7 @@ func TestSandboxCapabilities(t *testing.T) {
 		ID:          "com.test.allowed",
 		Permissions: []string{"ui:sidebar"},
 	}
-	
+
 	sandbox1 := NewSandbox(
 		context.Background(),
 		manifestAllowed,
@@ -20,9 +20,13 @@ func TestSandboxCapabilities(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
+		nil,
 		nil, // emit: nil disables Wails event broadcasting in tests
+		nil, // confirm: nil allows operations without UI in tests
 	)
-	
+
 	// This should succeed without panic
 	script1 := `
 		Aether.ui.registerSidebarPage({ id: "test", label: "Test Page", url: "ui/index.html" });
@@ -31,13 +35,13 @@ func TestSandboxCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected script to run successfully, got: %v", err)
 	}
-	
+
 	// 2. Create a manifest WITHOUT any permissions
 	manifestDenied := Manifest{
 		ID:          "com.test.denied",
 		Permissions: []string{},
 	}
-	
+
 	sandbox2 := NewSandbox(
 		context.Background(),
 		manifestDenied,
@@ -46,9 +50,13 @@ func TestSandboxCapabilities(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
+		nil,
 		nil, // emit: nil disables Wails event broadcasting in tests
+		nil, // confirm: nil allows operations without UI in tests
 	)
-	
+
 	// This should throw a JS error because Aether.ui is undefined
 	script2 := `
 		Aether.ui.registerSidebarPage({ id: "test", label: "Test Page", url: "ui/index.html" });
@@ -56,5 +64,46 @@ func TestSandboxCapabilities(t *testing.T) {
 	err = sandbox2.Execute(script2)
 	if err == nil {
 		t.Fatalf("Expected script to fail due to missing capabilities, but it succeeded")
+	}
+}
+
+func TestSandboxURLAllowList(t *testing.T) {
+	manifest := Manifest{
+		ID:          "com.test.network",
+		Permissions: []string{"network:http"},
+		Hosts:       []string{"example.com"},
+	}
+	sandbox := NewSandbox(context.Background(), manifest, "http://localhost", nil, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	if err := sandbox.Execute(`Aether.http.get("https://example.com.evil.test/data");`); err == nil {
+		t.Fatal("expected a deceptive hostname to be rejected")
+	}
+}
+
+func TestSandboxGranularModPermissionAndConfirmation(t *testing.T) {
+	install := func(string, string, string) (string, error) { return "mod.jar", nil }
+	confirmCalled := false
+	confirm := func(action map[string]interface{}) bool {
+		confirmCalled = action["action"] == "install mod"
+		return false
+	}
+	manifest := Manifest{
+		ID:          "com.test.mods",
+		Name:        "Mod Test",
+		Permissions: []string{"mods:install"},
+		Hosts:       []string{"example.com"},
+	}
+	sandbox := NewSandbox(context.Background(), manifest, "http://localhost", nil, nil, nil, install, nil, nil, nil, nil, confirm)
+	if err := sandbox.Execute(`Aether.instances.installMod("instance", "mod.jar", "https://example.com/mod.jar");`); err == nil {
+		t.Fatal("expected denied confirmation to stop mod installation")
+	}
+	if !confirmCalled {
+		t.Fatal("expected mod installation to request confirmation")
+	}
+
+	listOnly := Manifest{ID: "com.test.list", Permissions: []string{"instances:list"}}
+	listSandbox := NewSandbox(context.Background(), listOnly, "http://localhost", nil, nil, nil, install, nil, nil, nil, nil, nil)
+	if err := listSandbox.Execute(`Aether.instances.installMod("instance", "mod.jar", "https://example.com/mod.jar");`); err == nil {
+		t.Fatal("expected list-only extension to lack installMod")
 	}
 }

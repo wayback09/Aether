@@ -3,10 +3,12 @@ const elements = {
     loadingState: document.getElementById('loading'),
     emptyState: document.getElementById('empty-state'),
     modsContainer: document.querySelector('.mods-container'),
-    modRowTemplate: document.getElementById('mod-row-template')
+    modRowTemplate: document.getElementById('mod-row-template'),
+    confirmation: document.getElementById('confirmation')
 };
 
 let currentInstanceId = null;
+let pendingDelete = null;
 
 // Helper: Send a message to the Goja backend
 function sendMessage(action, payload = {}) {
@@ -70,16 +72,8 @@ function renderMods(mods) {
         // Delete event listener
         const deleteBtn = row.querySelector('.delete-btn');
         deleteBtn.addEventListener('click', () => {
-            if (confirm(`Are you sure you want to delete ${modFilename}?`)) {
-                sendMessage('delete_mod', {
-                    instanceId: currentInstanceId,
-                    jarName: modFilename
-                });
-                row.remove();
-                if (elements.modsContainer.children.length === 0) {
-                    elements.emptyState.classList.remove('hidden');
-                }
-            }
+            pendingDelete = { modFilename, row };
+            elements.confirmation.classList.remove('hidden');
         });
 
         elements.modsContainer.appendChild(row);
@@ -131,3 +125,30 @@ elements.instancesDropdown.addEventListener('change', (e) => {
 
 // Init
 sendMessage('get_instances');
+
+document.getElementById('cancel-delete').addEventListener('click', () => {
+    pendingDelete = null;
+    elements.confirmation.classList.add('hidden');
+});
+
+document.getElementById('confirm-delete').addEventListener('click', () => {
+    if (!pendingDelete) return;
+    const { modFilename, row } = pendingDelete;
+    sendMessage('delete_mod', {
+        instanceId: currentInstanceId,
+        jarName: modFilename
+    });
+    row.remove();
+    if (elements.modsContainer.children.length === 0) {
+        elements.emptyState.classList.remove('hidden');
+    }
+    pendingDelete = null;
+    elements.confirmation.classList.add('hidden');
+});
+
+elements.confirmation.addEventListener('click', (event) => {
+    if (event.target === elements.confirmation) {
+        pendingDelete = null;
+        elements.confirmation.classList.add('hidden');
+    }
+});

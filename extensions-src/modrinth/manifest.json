@@ -9,9 +9,11 @@
   "api": "1.0",
   "permissions": [
     "ui:sidebar",
-    "instances:patch"
+    "instances:list",
+    "mods:install"
   ],
   "hosts": [
+    "api.modrinth.com",
     "cdn.modrinth.com"
   ]
 }

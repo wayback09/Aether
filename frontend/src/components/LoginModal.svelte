@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { LoginOffline } from '../../wailsjs/go/main/App';
+  import { LoginOffline, StartMicrosoftAuth } from '../../wailsjs/go/main/App';
 
   export let showModal = false;
 
@@ -8,7 +8,22 @@
 
   let username = '';
   let isLoading = false;
+  let isMsLoading = false;
   let errorMsg = '';
+
+  async function handleMicrosoftLogin() {
+    isMsLoading = true;
+    errorMsg = '';
+    try {
+      const account = await StartMicrosoftAuth();
+      dispatch('login', account);
+      showModal = false;
+    } catch (err: any) {
+      errorMsg = err?.toString() || 'Microsoft login failed';
+    } finally {
+      isMsLoading = false;
+    }
+  }
   
   async function handleLogin() {
     if (!username.trim()) {
@@ -24,8 +39,8 @@
       dispatch('login', account);
       showModal = false;
       username = '';
-    } catch (err) {
-      errorMsg = err.toString();
+    } catch (err: any) {
+      errorMsg = err?.toString() || 'Offline login failed';
     } finally {
       isLoading = false;
     }
@@ -33,20 +48,20 @@
 </script>
 
 {#if showModal}
-  <div class="modal-backdrop" on:click={() => { showModal = false; }} on:keydown={(e) => e.key === 'Escape' && (showModal = false)} role="button" tabindex="0">
+  <div class="modal-backdrop" on:click={() => { if(!isMsLoading && !isLoading) showModal = false; }} on:keydown={(e) => e.key === 'Escape' && !isMsLoading && !isLoading && (showModal = false)} role="button" tabindex="0">
     <div class="modal" on:click|stopPropagation on:keydown|stopPropagation role="button" tabindex="0">
       
       <h2>Sign In</h2>
       <p class="subtitle">Log in to play Minecraft.</p>
       
-      <button class="btn primary btn-microsoft" disabled>
+      <button class="btn primary btn-microsoft" on:click={handleMicrosoftLogin} disabled={isMsLoading || isLoading}>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 21 21">
           <rect x="1" y="1" width="9" height="9" fill="#f35325"/>
           <rect x="11" y="1" width="9" height="9" fill="#81bc06"/>
           <rect x="1" y="11" width="9" height="9" fill="#05a6f0"/>
           <rect x="11" y="11" width="9" height="9" fill="#ffba08"/>
         </svg>
-        Coming soon
+        {isMsLoading ? 'Authenticating in browser...' : 'Sign in with Microsoft'}
       </button>
 
       <div class="divider">
@@ -61,7 +76,7 @@
           bind:value={username} 
           placeholder="e.g. Notch" 
           on:keydown={(e) => e.key === 'Enter' && handleLogin()}
-          disabled={isLoading}
+          disabled={isMsLoading || isLoading}
         />
         {#if errorMsg}
           <span class="error">{errorMsg}</span>
@@ -69,8 +84,8 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn secondary" on:click={() => showModal = false} disabled={isLoading}>Cancel</button>
-        <button class="btn primary" on:click={handleLogin} disabled={isLoading || !username.trim()}>
+        <button class="btn secondary" on:click={() => showModal = false} disabled={isMsLoading || isLoading}>Cancel</button>
+        <button class="btn primary" on:click={handleLogin} disabled={isMsLoading || isLoading || !username.trim()}>
           {isLoading ? 'Logging in...' : 'Offline Login'}
         </button>
       </div>

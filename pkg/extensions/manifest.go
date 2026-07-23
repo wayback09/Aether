@@ -23,3 +23,25 @@ func (m *Manifest) HasPermission(perm string) bool {
 	}
 	return false
 }
+
+// HasAnyPermission reports whether the manifest grants one of the requested
+// capabilities. The legacy instances:patch permission remains supported as a
+// migration path for existing extensions.
+func (m *Manifest) HasAnyPermission(permissions ...string) bool {
+	for _, permission := range permissions {
+		if m.HasPermission(permission) {
+			return true
+		}
+	}
+	return m.HasPermission("instances:patch") && hasInstancePatchCapability(permissions...)
+}
+
+func hasInstancePatchCapability(permissions ...string) bool {
+	for _, permission := range permissions {
+		switch permission {
+		case "instances:list", "mods:list", "mods:install", "mods:delete", "mods:toggle":
+			return true
+		}
+	}
+	return false
+}

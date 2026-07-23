@@ -2,6 +2,7 @@ package instance
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -82,7 +83,11 @@ func GetActiveInstance() *Instance {
 
 // UpdateInstance saves the modified instance data to disk
 func UpdateInstance(inst *Instance) error {
-	manifestPath := filepath.Join(fs.GetDataDir(), "instances", inst.ID, "instance.json")
+	instanceDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), inst.ID)
+	if err != nil {
+		return err
+	}
+	manifestPath := filepath.Join(instanceDir, "instance.json")
 	data, err := json.MarshalIndent(inst, "", "  ")
 	if err != nil {
 		return err
@@ -92,6 +97,12 @@ func UpdateInstance(inst *Instance) error {
 
 // DeleteInstance permanently removes an instance directory from disk
 func DeleteInstance(id string) error {
-	instanceDir := filepath.Join(fs.GetDataDir(), "instances", id)
+	if id == "" {
+		return fmt.Errorf("instance ID cannot be empty")
+	}
+	instanceDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), id)
+	if err != nil {
+		return err
+	}
 	return os.RemoveAll(instanceDir)
 }

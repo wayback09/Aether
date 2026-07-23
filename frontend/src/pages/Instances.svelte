@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { GetInstances, GetAvailableVersions, CreateInstance, GetModLoaders } from '../../wailsjs/go/main/App.js';
+  import { GetInstances, GetAvailableVersions, CreateInstance, GetModLoaders, SelectAndImportInstance } from '../../wailsjs/go/main/App.js';
   import Dropdown from '../components/Dropdown.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { toast } from '../stores/toast';
@@ -56,13 +56,24 @@
       isCreating = false;
     }
   }
+
+  async function handleImport() {
+    try {
+      if (await SelectAndImportInstance()) {
+        await loadInstances();
+        toast.success('Instance imported successfully!');
+      }
+    } catch (err: any) {
+      toast.error('Failed to import instance: ' + err);
+    }
+  }
 </script>
 
 <div class="page">
   <header class="page-header">
     <h1>Instances</h1>
     <div class="actions">
-      <button class="btn btn-secondary">Import</button>
+      <button class="btn btn-secondary" on:click={handleImport}>Import</button>
       <button class="btn btn-primary" on:click={() => showModal = true}>Create New</button>
     </div>
   </header>
@@ -89,7 +100,7 @@
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn btn-primary">Play</button>
+            <button class="btn btn-primary" on:click={() => dispatch('navigate', `home:instance:${instance.id}`)}>Play</button>
             <button class="btn btn-secondary" on:click={() => dispatch('navigate', `instance-details:${instance.id}`)}>Settings</button>
           </div>
         </div>

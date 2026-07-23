@@ -57,6 +57,17 @@
         </div>
     </template>
 
+    <div id="confirmation" class="confirmation hidden" role="presentation">
+        <div class="confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
+            <h2 id="confirmation-title">Delete mod?</h2>
+            <p>This will remove the mod file from the selected instance.</p>
+            <div class="confirmation-actions">
+                <button id="cancel-delete" class="cancel-btn">Cancel</button>
+                <button id="confirm-delete" class="confirm-btn">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

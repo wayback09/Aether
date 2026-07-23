@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"Aether/pkg/fs"
+	"github.com/zalando/go-keyring"
 )
 
 // AccountType defines the type of account
@@ -15,6 +16,7 @@ type AccountType string
 
 const (
 	TypeOffline   AccountType = "offline"
+	TypeMicrosoft AccountType = "microsoft"
 )
 
 // Account represents a user profile
@@ -24,6 +26,7 @@ type Account struct {
 	Username     string      `json:"username"`
 	AccessToken  string      `json:"accessToken,omitempty"`
 	RefreshToken string      `json:"refreshToken,omitempty"`
+	ExpiresAt    int64       `json:"expiresAt,omitempty"`
 }
 
 // AccountStore represents the accounts.json file structure
@@ -99,6 +102,26 @@ func AddOfflineAccount(username string) (Account, error) {
 	return newAcc, err
 }
 
+// AddMicrosoftAccount saves a Microsoft account and sets it as active
+func AddMicrosoftAccount(acc Account) error {
+	if err := LoadAccounts(); err != nil {
+		return err
+	}
+
+	// Replace if exists
+	for i, existing := range store.Accounts {
+		if existing.ID == acc.ID {
+			store.Accounts[i] = acc
+			store.ActiveAccountID = acc.ID
+			return SaveAccounts()
+		}
+	}
+
+	store.Accounts = append(store.Accounts, acc)
+	store.ActiveAccountID = acc.ID
+	return SaveAccounts()
+}
+
 
 // RemoveAccount removes an account by ID
 func RemoveAccount(id string) error {
@@ -122,6 +145,7 @@ func RemoveAccount(id string) error {
 		}
 	}
 
+	_ = keyring.Delete(KeyringService, id)
 	return SaveAccounts()
 }
 

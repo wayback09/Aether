@@ -1,10 +1,7 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { GetSettings, SaveSettings } from '../../wailsjs/go/main/App.js';
   import Dropdown from '../components/Dropdown.svelte';
-  import Icon from '../components/Icon.svelte';
-
-  const dispatch = createEventDispatcher();
 
   let settings = {
     defaultMemory: '4096',
@@ -66,10 +63,10 @@
       <h2>General</h2>
       
       <div class="form-group">
-        <label>
+        <div class="field-label">
           <div class="label-title">Default Memory Allocation</div>
           <div class="label-desc">Memory used for new instances or instances set to 'Default'.</div>
-        </label>
+        </div>
         <div class="control-wrap">
           <Dropdown options={memoryOptions} bind:value={settings.defaultMemory} />
         </div>

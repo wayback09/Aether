@@ -136,16 +136,17 @@ async function search(query) {
     resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Searching Modrinth...</p></div>';
 
     try {
-        const res = await fetch(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=20&facets=[["project_type:mod"]]`);
+        const res = await fetch(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=20`);
         if (!res.ok) throw new Error('API Error ' + res.status);
         const data = await res.json();
+        const modHits = data.hits.filter(hit => hit.project_type === 'mod');
 
-        if (!data.hits.length) {
-            resultsDiv.innerHTML = '<div class="placeholder-wrap"><div class="placeholder-icon">📦</div><p>No mods found.</p></div>';
+        if (!modHits.length) {
+            resultsDiv.innerHTML = '<div class="placeholder-wrap"><div class="placeholder-icon">&#128230;</div><p>No mods found.</p></div>';
             return;
         }
 
-        resultsDiv.innerHTML = '<div class="grid">' + data.hits.map(hit => {
+        resultsDiv.innerHTML = '<div class="grid">' + modHits.map(hit => {
             const icon = hit.icon_url
                 ? `<img src="${hit.icon_url}" class="card-icon" alt="" />`
                 : `<div class="card-icon card-icon-placeholder">${hit.title.charAt(0)}</div>`;

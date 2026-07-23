@@ -20,10 +20,11 @@
     show = false;
   }
 
-  export function open(titleText: string, messageText: string, isDanger = false) {
+  export function open(titleText: string, messageText: string, isDanger = false, confirmText = 'OK') {
     title = titleText;
     message = messageText;
     danger = isDanger;
+    confirmLabel = confirmText;
     show = true;
   }
 </script>

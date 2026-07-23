@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"Aether/pkg/fs"
 	"Aether/pkg/instance"
@@ -23,6 +26,9 @@ type Manager struct {
 	sandboxes        map[string]*Sandbox
 	SidebarPages     []map[string]interface{}
 	ModLoaders       map[string]ModLoaderConfig
+	pending          map[string]chan bool
+	pendingMu        sync.Mutex
+	auditMu          sync.Mutex
 }
 
 // ModLoaderConfig holds info about a registered mod loader
@@ -33,6 +39,8 @@ type ModLoaderConfig struct {
 	ExtensionID string
 	Callback    func(ctx map[string]interface{}) (map[string]interface{}, error)
 }
+
+const maxExtensionModSize int64 = 100 * 1024 * 1024
 
 // GlobalManager holds the singleton instance for UI access
 var GlobalManager *Manager
@@ -45,11 +53,18 @@ func NewManager(ctx context.Context) *Manager {
 		sandboxes:        make(map[string]*Sandbox),
 		SidebarPages:     make([]map[string]interface{}, 0),
 		ModLoaders:       make(map[string]ModLoaderConfig),
+		pending:          make(map[string]chan bool),
 	}
 }
 
 // LoadAll scans the directory, parses manifests, and executes the JS isolate
 func (m *Manager) LoadAll() error {
+	// Reloading replaces the in-memory view so removed extensions do not linger.
+	m.LoadedExtensions = make(map[string]Extension)
+	m.sandboxes = make(map[string]*Sandbox)
+	m.SidebarPages = make([]map[string]interface{}, 0)
+	m.ModLoaders = make(map[string]ModLoaderConfig)
+
 	// Start the local extension server
 	server := NewServer()
 	url, err := server.Start()
@@ -130,28 +145,59 @@ func (m *Manager) LoadAll() error {
 				},
 				func(instanceID, jarName, downloadURL string) (string, error) {
 					jarName = filepath.Base(jarName)
-					modsDir := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods")
+					if strings.ToLower(filepath.Ext(jarName)) != ".jar" {
+						return "", fmt.Errorf("mod file must have a .jar extension")
+					}
+					parsedURL, err := neturl.Parse(downloadURL)
+					if err != nil || parsedURL.Scheme != "https" || parsedURL.Hostname() == "" {
+						return "", fmt.Errorf("mod downloads require an HTTPS URL")
+					}
+					instanceDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), instanceID)
+					if err != nil {
+						return "", err
+					}
+					modsDir := filepath.Join(instanceDir, "mods")
 					if err := os.MkdirAll(modsDir, 0755); err != nil {
 						return "", err
 					}
 					destPath := filepath.Join(modsDir, jarName)
-					resp, err := http.Get(downloadURL)
+					req, err := http.NewRequestWithContext(m.ctx, http.MethodGet, downloadURL, nil)
+					if err != nil {
+						return "", err
+					}
+					resp, err := http.DefaultClient.Do(req)
 					if err != nil {
 						return "", err
 					}
 					defer resp.Body.Close()
+					if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+						return "", fmt.Errorf("mod download failed with status %s", resp.Status)
+					}
+					if resp.ContentLength > maxExtensionModSize {
+						return "", fmt.Errorf("mod exceeds the %d MB size limit", maxExtensionModSize/(1024*1024))
+					}
 					out, err := os.Create(destPath)
 					if err != nil {
 						return "", err
 					}
 					defer out.Close()
-					if _, err = io.Copy(out, resp.Body); err != nil {
+					written, err := io.Copy(out, io.LimitReader(resp.Body, maxExtensionModSize+1))
+					if err != nil {
+						_ = os.Remove(destPath)
 						return "", err
+					}
+					if written > maxExtensionModSize {
+						_ = os.Remove(destPath)
+						return "", fmt.Errorf("mod exceeds the %d MB size limit", maxExtensionModSize/(1024*1024))
 					}
 					return destPath, nil
 				},
 				func(instanceID string) ([]string, error) {
-					modsDir := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods")
+					instanceDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), instanceID)
+					if err != nil {
+						return nil, err
+					}
+					modsDir := filepath.Join(instanceDir, "mods")
 					entries, err := os.ReadDir(modsDir)
 					if err != nil {
 						if os.IsNotExist(err) {
@@ -169,15 +215,23 @@ func (m *Manager) LoadAll() error {
 				},
 				func(instanceID, jarName string) error {
 					jarName = filepath.Base(jarName)
-					modPath := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods", jarName)
+					instanceDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), instanceID)
+					if err != nil {
+						return err
+					}
+					modPath := filepath.Join(instanceDir, "mods", jarName)
 					return os.Remove(modPath)
 				},
 				func(instanceID, jarName string, enable bool) error {
 					jarName = filepath.Base(jarName)
-					modsDir := filepath.Join(fs.GetDataDir(), "instances", instanceID, "mods")
-					
+					instanceDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), instanceID)
+					if err != nil {
+						return err
+					}
+					modsDir := filepath.Join(instanceDir, "mods")
+
 					currentPath := filepath.Join(modsDir, jarName)
-					
+
 					if enable {
 						// We want to enable it. It must currently end in .disabled
 						if strings.HasSuffix(jarName, ".disabled") {
@@ -197,6 +251,7 @@ func (m *Manager) LoadAll() error {
 					}
 				},
 				runtime.EventsEmit,
+				m.requestConfirmation,
 			)
 			m.sandboxes[manifest.ID] = sandbox
 
@@ -220,6 +275,89 @@ func (m *Manager) LoadAll() error {
 		}
 	}
 	return nil
+}
+
+// requestConfirmation pauses a sensitive extension operation until the UI
+// responds or the request expires.
+func (m *Manager) requestConfirmation(action map[string]interface{}) bool {
+	id := fmt.Sprintf("extension-confirm-%d", time.Now().UnixNano())
+	response := make(chan bool, 1)
+	m.pendingMu.Lock()
+	m.pending[id] = response
+	m.pendingMu.Unlock()
+
+	action["requestId"] = id
+	m.audit("confirmation_requested", action)
+	runtime.EventsEmit(m.ctx, "extension:confirmation", action)
+
+	select {
+	case approved := <-response:
+		return approved
+	case <-time.After(2 * time.Minute):
+		m.pendingMu.Lock()
+		delete(m.pending, id)
+		m.pendingMu.Unlock()
+		m.audit("confirmation_expired", map[string]interface{}{"requestId": id})
+		return false
+	}
+}
+
+// ResolveConfirmation completes a pending extension operation from the UI.
+func (m *Manager) ResolveConfirmation(requestID string, approved bool) error {
+	m.pendingMu.Lock()
+	response, ok := m.pending[requestID]
+	if ok {
+		delete(m.pending, requestID)
+	}
+	m.pendingMu.Unlock()
+	if !ok {
+		return fmt.Errorf("extension confirmation request not found: %s", requestID)
+	}
+	response <- approved
+	m.audit("confirmation_resolved", map[string]interface{}{
+		"requestId": requestID,
+		"approved":  approved,
+	})
+	return nil
+}
+
+func (m *Manager) audit(event string, details map[string]interface{}) {
+	record := map[string]interface{}{
+		"event":     event,
+		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	for key, value := range details {
+		record[key] = value
+	}
+	data, err := json.Marshal(record)
+	if err != nil {
+		return
+	}
+
+	m.auditMu.Lock()
+	defer m.auditMu.Unlock()
+	logPath := filepath.Join(fs.GetDataDir(), "logs", "extension-security.log")
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	_, _ = file.Write(append(data, '\n'))
+}
+
+// Uninstall removes an extension directory after validating its ID.
+func (m *Manager) Uninstall(id string) error {
+	if id == "" {
+		return fmt.Errorf("extension ID cannot be empty")
+	}
+	extDir, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "extensions"), id)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(extDir); err != nil {
+		return err
+	}
+	return m.LoadAll()
 }
 
 // GetExtensions returns the list of loaded extensions

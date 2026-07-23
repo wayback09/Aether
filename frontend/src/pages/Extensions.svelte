@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { GetExtensions, SelectAndInstallExtension, DownloadAndInstallExtension, GetSettings } from '../../wailsjs/go/main/App.js';
+  import { GetExtensions, SelectAndInstallExtension, DownloadAndInstallExtension, GetSettings, UninstallExtension } from '../../wailsjs/go/main/App.js';
   import EmptyState from '../components/EmptyState.svelte';
+  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte';
   import { toast } from '../stores/toast';
 
   let installedExtensions: any[] = [];
@@ -15,6 +16,8 @@
   const GALLERY_INDEX_URL = 'https://raw.githubusercontent.com/wayback09/Aether-Extensions/main/index.json';
 
   let isDevMode = false;
+  let confirmDialog: any;
+  let pendingUninstall: any = null;
 
   async function loadInstalled() {
     try {
@@ -77,6 +80,28 @@
     } finally {
       isInstalling = false;
       installingId = '';
+    }
+  }
+
+  async function handleUninstall(ext: any) {
+    pendingUninstall = ext;
+    confirmDialog.open(
+      `Uninstall ${ext.name}?`,
+      `Are you sure you want to uninstall "${ext.name}"? Its extension files and sidebar pages will be removed.`,
+      true
+    );
+  }
+
+  async function handleUninstallConfirm(event: CustomEvent<boolean>) {
+    const ext = pendingUninstall;
+    pendingUninstall = null;
+    if (!event.detail || !ext) return;
+    try {
+      await UninstallExtension(ext.id);
+      await loadInstalled();
+      toast.success('Extension uninstalled.');
+    } catch (e: any) {
+      toast.error('Failed to uninstall extension: ' + e);
     }
   }
 
@@ -190,7 +215,7 @@
                     </div>
                   {/if}
                 </div>
-                <!-- TODO: Settings / Uninstall buttons -->
+                <button class="btn btn-secondary" on:click={() => handleUninstall(ext)}>Uninstall</button>
               </div>
             </div>
           </div>
@@ -264,6 +289,8 @@
     {/if}
   {/if}
 </div>
+
+<ConfirmDialog bind:this={confirmDialog} on:confirm={handleUninstallConfirm} />
 
 <style>
   .page {

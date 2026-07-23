@@ -12,7 +12,11 @@
   "permissions": [
     "ui:sidebar",
     "ui:dialogs",
-    "instances:patch",
+    "instances:list",
+    "mods:list",
+    "mods:install",
+    "mods:delete",
+    "mods:toggle",
     "launcher:modloader",
     "skin:export",
     "network:http",

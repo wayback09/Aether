@@ -1,5 +1,7 @@
 # Extensions Guide
 
+> **Current status:** `.zip` extensions and the Goja backend API described below are implemented. The CLI, SDK, `.aex` format, review workflow, and lifecycle APIs later in this document are planned and are not included in this repository yet.
+
 ## Architecture Overview
 Aether extensions operate in two distinct, isolated layers:
 1. **The Backend Sandbox (`main.js`)**: Runs in Aether's secure, headless Goja engine. It has no DOM access, but can interact with Aether's native Go APIs (e.g., to patch instances or read files, based on requested permissions).
@@ -41,10 +43,7 @@ my-extension.zip
 └── assets/
 ```
 
-**Installation**: Users can install your extension by simply dropping the `.zip` file into Aether's `Browse Extensions` page, or by placing the extracted folder directly into the Aether extensions directory:
-- **Windows**: `%APPDATA%/Aether/extensions/`
-- **macOS**: `~/Library/Application Support/Aether/extensions/`
-- **Linux**: `~/.config/Aether/extensions/`
+**Installation**: Users can install a `.zip` from the Extensions page or place an extracted folder in Aether's data directory under `extensions`. In development, the launcher uses a local `AetherData` directory when present; otherwise it uses the platform configuration directory.
 
 ## Manifest
 Every extension requires a `manifest.json` at its root.
@@ -57,24 +56,46 @@ Every extension requires a `manifest.json` at its root.
   "description": "Adds a cool new feature to Aether.",
   "main": "main.js",
   "api": "1.0",
+  "permissions": [
+    "ui:sidebar",
+    "instances:list",
+    "mods:install"
+  ]
+}
+```
+
+### Optional Registry Metadata
+
+The registry may also store metadata such as compatibility ranges and project links:
+
+```json
+{
   "minApi": "1.0",
   "maxApi": "2.0",
   "homepage": "https://example.com/myextension",
   "repository": "https://github.com/example/myextension",
   "license": "MIT",
-  "keywords": ["mods", "fabric"],
-  "permissions": [
-    "ui:sidebar",
-    "instances:patch"
-  ]
+  "keywords": ["mods", "fabric"]
 }
 ```
+
+These fields are retained for registry and future tooling use. The current launcher does not enforce API ranges or consume the project metadata when loading an extension.
 
 ## Permissions
 Extensions operate under a principle of least privilege. You must explicitly request access to APIs.
 - `ui:sidebar`: Register sidebar pages that render your `ui/index.html` in an iframe.
-- `ui:dialogs`: Open modal dialogs.
-- `instances:patch`: Modify instance JSON files (e.g., to install loaders like Fabric).
+- `ui:dialogs`: Exposes the current dialog stub; a functional dialog API is planned.
+- `instances:list`: List installed instances.
+- `mods:list`: List mods in an instance.
+- `mods:install`: Install a mod after launcher confirmation.
+- `mods:delete`: Delete a mod after launcher confirmation.
+- `mods:toggle`: Enable or disable a mod after launcher confirmation.
+- `network:http`: Make backend HTTP GET requests to allowed hosts.
+- `fs:download`: Download files to the shared `libraries` directory.
+- `launcher:modloader`: Register a launch-time mod-loader callback.
+- `skin:export`: Write base64 data below the shared `skins` directory.
+
+The legacy `instances:patch` permission remains supported for migration and grants the current instance/mod capabilities. New extensions should use the granular permissions above.
 
 ## Extension UI Rules
 Because extension UIs run inside an `<iframe>`, you have complete control over your DOM. You can use React, Vue, Svelte, Solid, Lit, or plain HTML/CSS. Aether is completely **framework-agnostic**.
@@ -84,15 +105,15 @@ However, to maintain a consistent user experience, we recommend matching Aether'
 ## Examples
 Check the `extensions-src/` directory in the Aether repository for complete sample extensions, including the Modrinth Browser and the Fabric mod loader.
 
-## Trust Tiers & Review Guidelines
-When an extension is published to the Aether Registry, it is assigned a trust tier. The launcher displays these badges so users know what they are installing:
+## Trust Tiers
+The Aether Registry may assign trust metadata. The launcher displays these badges, but the labels do not replace code review or provide a local security guarantee:
 
 1. 🔵 **Official**: Developed and maintained directly by the Aether Team.
 2. 🟢 **Verified**: Personally reviewed by an Aether maintainer. The code has been thoroughly audited for security, performance, and stability.
 3. 🟣 **Community**: Passed automated checks and was merged into the registry via Pull Request, but has not received a manual code audit. Use with caution.
 4. 🟡 **Local**: Installed manually from a `.zip` file. Aether treats these as untrusted.
 
-To get an extension **Verified**, it must pass a manual review:
+The registry's planned review process would consider:
 1. **No Malicious Code**: Extensions must not steal tokens, install malware, or attempt to break out of the Goja sandbox.
 2. **Performance**: Extensions must not leak memory or block the main thread.
 3. **Clear Purpose**: The extension must do exactly what its description claims.

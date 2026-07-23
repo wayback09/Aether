@@ -1,6 +1,8 @@
-# Aether SDK
+# Aether SDK (Planned)
 
-The Aether SDK (`@aether/sdk`) is the official development companion for building Aether extensions. It is a purely development-time package — it never ships inside your extension at runtime.
+> The CLI and `@aether/sdk` package described in this document are design plans. They are not currently published or included in this repository. The Go runtime and the examples in `docs/API.md` are the current source of truth.
+
+The planned Aether SDK (`@aether/sdk`) is intended to be the development companion for building Aether extensions. It is intended as a development-time package and would not ship inside an extension at runtime.
 
 ## CLI vs SDK
 

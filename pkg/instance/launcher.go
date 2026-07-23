@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"Aether/pkg/auth"
 	"Aether/pkg/fs"
@@ -76,29 +77,44 @@ func Launch(ctx context.Context, inst *Instance) error {
 	uuid := auth.GenerateOfflineUUID(username)
 	accessToken := "0"
 	userType := "legacy"
-	
+
 	if activeAccount != nil {
 		username = activeAccount.Username
 		uuid = activeAccount.ID
+		if activeAccount.Type == auth.TypeMicrosoft {
+			userType = "msa"
+			// Check if token is expired or close to expiration (within 5 minutes)
+			if activeAccount.ExpiresAt == 0 || time.Now().Unix() > (activeAccount.ExpiresAt-300) {
+				fmt.Println("[Launcher] Microsoft access token expired or expiring soon, refreshing...")
+				refreshed, err := auth.RefreshMicrosoftToken(ctx, activeAccount)
+				if err == nil {
+					_ = auth.AddMicrosoftAccount(*refreshed)
+					activeAccount = refreshed
+				} else {
+					fmt.Printf("[Launcher] Failed to refresh token: %v\n", err)
+				}
+			}
+			accessToken = activeAccount.AccessToken
+		}
 	}
 
 	vars := map[string]string{
 		"${auth_player_name}":  username,
-		"${version_name}":     versionInfo.ID,
-		"${game_directory}":   instanceDir,
-		"${assets_root}":      assetsDir,
+		"${version_name}":      versionInfo.ID,
+		"${game_directory}":    instanceDir,
+		"${assets_root}":       assetsDir,
 		"${assets_index_name}": versionInfo.Assets,
-		"${auth_uuid}":        uuid,
+		"${auth_uuid}":         uuid,
 		"${auth_access_token}": accessToken,
-		"${clientid}":         "0",
-		"${auth_xuid}":        "0",
-		"${user_type}":        userType,
-		"${version_type}":     versionInfo.Type,
+		"${clientid}":          "0",
+		"${auth_xuid}":         "0",
+		"${user_type}":         userType,
+		"${version_type}":      versionInfo.Type,
 		"${natives_directory}": nativesDir,
-		"${launcher_name}":    "Aether",
-		"${launcher_version}": "1.0",
-		"${classpath}":        classpath,
-		"${path}":             filepath.Join(instanceDir, versionInfo.Logging.Client.File.ID),
+		"${launcher_name}":     "Aether",
+		"${launcher_version}":  "1.0",
+		"${classpath}":         classpath,
+		"${path}":              filepath.Join(instanceDir, versionInfo.Logging.Client.File.ID),
 	}
 
 	// Mod Loader Interception
@@ -148,7 +164,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 	if memory == "" || memory == "Default" {
 		memory = globalSettings.DefaultMemory
 	}
-	
+
 	// If memory string doesn't specify M or G (like "4096"), append M
 	if !strings.HasSuffix(strings.ToUpper(memory), "M") && !strings.HasSuffix(strings.ToUpper(memory), "G") {
 		memory += "M"
@@ -227,7 +243,7 @@ func Launch(ctx context.Context, inst *Instance) error {
 			state = "Crashed"
 			fmt.Printf("[Launcher] Minecraft exited with error: %v\n", err)
 		}
-		
+
 		if globalSettings.CloseOnLaunch {
 			runtime.WindowShow(ctx)
 		}
@@ -252,7 +268,7 @@ func buildClasspath(instanceDir string, info *mojang.VersionInfo) string {
 		if lib.Downloads.Artifact.Path == "" {
 			continue
 		}
-		
+
 		libPath := filepath.Join(instanceDir, "libraries", lib.Downloads.Artifact.Path)
 		if _, err := os.Stat(libPath); err == nil {
 			paths = append(paths, libPath)
@@ -263,7 +279,7 @@ func buildClasspath(instanceDir string, info *mojang.VersionInfo) string {
 	clientJar := filepath.Join(instanceDir, "bin", info.ID+".jar")
 	paths = append(paths, clientJar)
 
-	return strings.Join(paths, ";") // Windows uses semicolon
+	return strings.Join(paths, string(os.PathListSeparator))
 }
 
 // substituteVars replaces ${variable} placeholders in arguments

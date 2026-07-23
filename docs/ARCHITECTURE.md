@@ -7,24 +7,22 @@ The launcher backend is written in Go to ensure high performance, memory safety,
 - `main.go`: The main entry point.
 - `pkg/instance`: Logic for managing Minecraft instances, resolving dependencies, and constructing launch arguments.
 - `pkg/java`: Discovery, installation, and management of Java Runtimes (JRE/JDK).
-- `pkg/auth`: Offline player authentication and token management.
+- `pkg/auth`: Offline account storage and deterministic offline UUID generation.
 - `pkg/extensions`: The extension manager and sandbox environment.
 
 ## Extension Manager
-The Extension Manager (`pkg/extensions`) is responsible for discovering, validating, and executing extensions. 
+The Extension Manager (`pkg/extensions`) is responsible for discovering, installing, and executing extensions. Manifest parsing and install-time ID checks are implemented; a broader extension validator is planned.
 Extensions are executed in an isolated JavaScript runtime (Goja). They do not have direct access to the host OS. Any action an extension wants to perform must be requested through the launcher's API, which enforces the capability-based permission model.
 
-## Updater
-The updater is built into the core launcher but operates independently.
-- **Launcher Updates**: The launcher downloads new binaries in the background and swaps them on the next restart.
-- **Extension Updates**: Extensions are checked for updates periodically. Updates are applied automatically unless configured otherwise, minimizing user friction.
+## Planned Features
+An updater is described in the longer-term architecture but is not implemented in the current codebase. Launcher and extension updates are currently manual.
 
 ## Launcher Pipeline
 1. **Resolution**: Determine the Minecraft version, loader (Fabric, Forge, etc.), and required libraries.
 2. **Verification**: Check if all assets, libraries, and the Java runtime are present. Download missing files.
-3. **Authentication**: Ensure the offline session token is populated.
+3. **Authentication**: Load the selected offline account and deterministic UUID.
 4. **Execution**: Construct the massive Java command line and spawn the child process.
-5. **Monitoring**: Pipe standard output/error to the log manager and monitor the process state.
+5. **Monitoring**: Emit process state and log events to the Wails frontend.
 
 ## Diagrams
 
@@ -61,12 +59,13 @@ sequenceDiagram
     participant Sandbox as Goja Sandbox
     participant API as Aether Core API
     
-    Sandbox->>API: Aether.instances.patch(id, data)
+    Sandbox->>API: Aether.instances.installMod(id, file, url)
     API->>API: Check Extension Manifest
     
-    alt Has 'instances:patch' permission
-        API->>API: Apply Patch
-        API-->>Sandbox: Success (true)
+    alt Has granular mod permission
+        API-->>UI: Request user confirmation
+        UI-->>API: Approve or reject
+        API-->>Sandbox: Continue or throw error
     else Missing permission
         API-->>Sandbox: Throw Error ("Permission Denied")
     end

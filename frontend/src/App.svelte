@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { EventsOn } from '../wailsjs/runtime/runtime.js';
+  import { ResolveExtensionConfirmation } from '../wailsjs/go/main/App.js';
   import TitleBar from './components/TitleBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import CommandPalette from './components/CommandPalette.svelte';
@@ -10,12 +12,15 @@
   import ExtensionView from './pages/ExtensionView.svelte';
   import InstanceDetails from './pages/InstanceDetails.svelte';
   import Settings from './pages/Settings.svelte';
+  import ConfirmDialog from './lib/components/ConfirmDialog.svelte';
 
   let activePage = 'home';
   let targetInstanceId = '';
   let activeInstanceId = '';
   let extensionRoutes: Record<string, { url: string; extensionId: string }> = {};
   let paletteOpen = false;
+  let confirmationDialog: any;
+  let pendingConfirmation: any = null;
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 
@@ -75,8 +80,41 @@
     }
   }
 
-  onMount(() => window.addEventListener('keydown', onGlobalKeydown));
-  onDestroy(() => window.removeEventListener('keydown', onGlobalKeydown));
+  function showExtensionConfirmation(request: any) {
+    pendingConfirmation = request;
+    const extensionName = request.extensionName || request.extensionId || 'An extension';
+    const action = request.action || 'perform a sensitive action';
+    const target = request.jarName
+      ? `mod "${request.jarName}" in instance "${request.instanceId}"`
+      : `instance "${request.instanceId}"`;
+    const source = request.url ? `\n\nSource: ${request.url}` : '';
+    confirmationDialog.open(
+      'Allow extension action?',
+      `${extensionName} wants to ${action} on ${target}. This may change files that Minecraft will load.${source}`,
+      true,
+      'Allow'
+    );
+  }
+
+  async function resolveExtensionConfirmation(event: CustomEvent<boolean>) {
+    const request = pendingConfirmation;
+    pendingConfirmation = null;
+    if (!request) return;
+    try {
+      await ResolveExtensionConfirmation(request.requestId, event.detail);
+    } catch (error) {
+      console.error('Failed to resolve extension confirmation:', error);
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', onGlobalKeydown);
+    const unsubscribe = EventsOn('extension:confirmation', showExtensionConfirmation);
+    return () => {
+      window.removeEventListener('keydown', onGlobalKeydown);
+      unsubscribe();
+    };
+  });
 </script>
 
 <div class="app-container">
@@ -115,6 +153,8 @@
 
   <!-- Global Toasts -->
   <ToastContainer />
+
+  <ConfirmDialog bind:this={confirmationDialog} on:confirm={resolveExtensionConfirmation} />
 </div>
 
 <style>

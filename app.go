@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -30,7 +33,7 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	fs.EnsureDirectories()
-	
+
 	globalSettings := settings.Load()
 
 	if !globalSettings.DisableExtensions {
@@ -86,6 +89,14 @@ func (a *App) SendExtensionMessage(extID string, payload map[string]interface{})
 	if extensions.GlobalManager != nil {
 		extensions.GlobalManager.HandleIPCMessage(extID, payload)
 	}
+}
+
+// ResolveExtensionConfirmation approves or rejects a sensitive extension action.
+func (a *App) ResolveExtensionConfirmation(requestID string, approved bool) error {
+	if extensions.GlobalManager == nil {
+		return fmt.Errorf("extensions are disabled")
+	}
+	return extensions.GlobalManager.ResolveConfirmation(requestID, approved)
 }
 
 // ModLoaderInfo represents a registered mod loader
@@ -184,6 +195,83 @@ func (a *App) DownloadAndInstallExtension(url string) (bool, error) {
 	return true, nil
 }
 
+// UninstallExtension removes a locally installed extension and reloads the manager.
+func (a *App) UninstallExtension(id string) error {
+	if extensions.GlobalManager == nil {
+		return fmt.Errorf("extensions are disabled")
+	}
+	return extensions.GlobalManager.Uninstall(id)
+}
+
+// SelectAndImportInstance imports an existing instance directory.
+func (a *App) SelectAndImportInstance() (bool, error) {
+	source, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Select Minecraft Instance"})
+	if err != nil {
+		return false, err
+	}
+	if source == "" {
+		return false, nil
+	}
+
+	manifestPath := filepath.Join(source, "instance.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return false, fmt.Errorf("invalid instance: missing instance.json: %w", err)
+	}
+	var imported instance.Instance
+	if err := json.Unmarshal(data, &imported); err != nil {
+		return false, fmt.Errorf("invalid instance manifest: %w", err)
+	}
+	if imported.ID == "" {
+		imported.ID = strings.ToLower(strings.ReplaceAll(filepath.Base(source), " ", "-"))
+	}
+	if imported.ID == "" || imported.Version == "" {
+		return false, fmt.Errorf("instance manifest must include an ID and version")
+	}
+
+	target, err := fs.ContainedPath(filepath.Join(fs.GetDataDir(), "instances"), imported.ID)
+	if err != nil {
+		return false, err
+	}
+	if _, err := os.Stat(target); err == nil {
+		return false, fmt.Errorf("instance already exists: %s", imported.ID)
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+
+	if err := copyDirectory(source, target); err != nil {
+		_ = os.RemoveAll(target)
+		return false, fmt.Errorf("failed to import instance: %w", err)
+	}
+	return true, nil
+}
+
+func copyDirectory(source, target string) error {
+	return filepath.WalkDir(source, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		dest, err := fs.ContainedPath(target, rel)
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return os.MkdirAll(dest, 0755)
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symbolic links are not supported in imported instances")
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dest, contents, 0644)
+	})
+}
 
 func (a *App) GetActiveAccount() *auth.Account {
 	return auth.GetActiveAccount()
@@ -197,6 +285,18 @@ func (a *App) GetAccounts() []auth.Account {
 // LoginOffline creates or switches to an offline account with the given username
 func (a *App) LoginOffline(username string) (auth.Account, error) {
 	return auth.AddOfflineAccount(username)
+}
+
+// StartMicrosoftAuth initiates the Microsoft OAuth2 PKCE login flow
+func (a *App) StartMicrosoftAuth() (auth.Account, error) {
+	acc, err := auth.StartPKCEAuthFlow(a.ctx)
+	if err != nil {
+		return auth.Account{}, err
+	}
+	if err := auth.AddMicrosoftAccount(*acc); err != nil {
+		return auth.Account{}, err
+	}
+	return *acc, nil
 }
 
 // SetActiveAccount sets the active account by ID

@@ -1,26 +1,25 @@
 # Security
 
 ## Sandbox
-All extensions are executed inside a heavily restricted JavaScript isolate. They do not have access to the Node.js standard library, the DOM of the main launcher window, or the underlying operating system. The only way an extension can affect the outside world is via the exposed `Aether` API, which validates every request.
+Extension backend scripts run in a Goja JavaScript runtime. They do not receive Node.js modules, Go APIs, shell access, or direct access to the host filesystem. The supported integration surface is the injected `Aether` object, whose capabilities are added according to the permissions in the manifest.
+
+This is a capability boundary, not a complete OS-level security boundary. Extensions with instance or download permissions can change shared launcher data through those APIs.
 
 ## Whitelisted Networking
 By default, extensions cannot make outbound network requests. 
-If an extension needs to communicate with an external API (e.g., Modrinth or CurseForge), it must declare the specific domains in its `manifest.json` under `hosts`.
-The user is informed of these domains during installation.
+If an extension needs to communicate with an external API, it must declare allowed hostnames in its `manifest.json` under `hosts`. Requests are limited to HTTP(S) URLs whose hostname matches an allowed host or one of its subdomains. The launcher does not currently show a separate host approval screen during installation.
 
 ```json
 "hosts": [
-  "https://api.modrinth.com/*"
+    "api.modrinth.com"
 ]
 ```
 
 ## Capability Model
-The security architecture uses a capability-based model. Instead of giving an extension raw file system access to read logs, the launcher provides a specific `Aether.instances.getLogs(id)` function. This ensures the extension can only read logs and nothing else. If an extension attempts to call an API it lacks permissions for, the call is immediately rejected, and a security warning is logged.
+The runtime uses a capability-based model. An extension only receives the API objects associated with its declared permissions. Calls to unavailable capabilities fail in the JavaScript runtime. The current instance capability is limited to listing instances and installing, listing, deleting, or toggling mods; it does not provide general instance JSON or log access.
 
-## Review Process
-1. **Automated Analysis**: Static analysis tools scan the submitted extension bundle for obfuscated code, forbidden API usage, and known vulnerabilities.
-2. **Manual Review**: A human reviewer inspects the manifest, permissions, and core logic.
-3. **Community Reporting**: Users can flag suspicious extensions, which triggers an immediate quarantine and manual re-evaluation.
+## Registry Trust
+The extension gallery can assign trust labels such as Official, Verified, Community, or Local. These labels are registry metadata displayed by the launcher; the current application does not perform automated code analysis, quarantine extensions, or enforce a maintainer review workflow.
 
 ## Threat Model
 **Expected Threats:**
@@ -35,10 +34,11 @@ Every privileged operation is strictly mediated by the launcher. Extensions expl
 - Execute arbitrary shell commands (e.g., via `os/exec`).
 - Access the filesystem directly (they can only use scoped `Aether.fs` APIs).
 - Read launcher memory.
-- Access another extension's data.
-- Escape the Goja sandbox (which has zero bindings by default).
+- Escape the Goja runtime through Node.js or Go bindings.
 - Access Go APIs directly.
 
-- Token access is strictly forbidden for extensions. Authentication is handled entirely by the core Go backend.
-- File system access is abstracted. Extensions cannot read or write outside their designated isolated storage directory unless explicitly granted highly scrutinized permissions.
-- Network access is strictly allow-listed.
+- Authentication is currently offline-only. Extensions are not given account credentials or tokens through the `Aether` API.
+- File access is abstracted through scoped APIs, but the permitted locations are shared launcher directories such as instance `mods`, `libraries`, and `skins`; they are not isolated per extension.
+- Network access is HTTPS-only and host-allow-listed. Requests are not currently rate-limited or security-logged, but backend responses and mod downloads have size limits.
+
+Sensitive extension confirmation requests and their decisions are recorded as JSON lines in `logs/extension-security.log`.

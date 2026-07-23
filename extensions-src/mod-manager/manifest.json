@@ -9,6 +9,10 @@
   "api": "1.0",
   "permissions": [
     "ui:sidebar",
-    "instances:patch"
+    "instances:list",
+    "mods:list",
+    "mods:install",
+    "mods:delete",
+    "mods:toggle"
   ]
 }

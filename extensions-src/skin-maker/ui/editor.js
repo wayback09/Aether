@@ -24,6 +24,16 @@ var selectedPartId = null;
 var selectedFace = null;
 var colorHistory = ['#d4a574', '#5c3a1e', '#000000', '#5555ff', '#333366', '#ffffff'];
 
+function showNotice(message) {
+    var notice = document.getElementById('notice');
+    notice.textContent = message;
+    notice.classList.remove('hidden');
+    clearTimeout(showNotice.timer);
+    showNotice.timer = setTimeout(function () {
+        notice.classList.add('hidden');
+    }, 3500);
+}
+
 // Build the color grid
 function buildColorGrid() {
     var grid = document.getElementById('color-grid');
@@ -137,14 +147,14 @@ document.getElementById('apply-custom').addEventListener('click', function () {
 // Import skin into editor
 document.getElementById('import-editor-btn').addEventListener('click', function () {
     var name = document.getElementById('username-input').value.trim();
-    if (!name) { alert('Enter a username in the search bar first'); return; }
+    if (!name) { showNotice('Enter a username in the search bar first'); return; }
     window.parent.postMessage({ type: "fetch_profile", username: name, reqId: 'editor' }, '*');
 });
 
 window.addEventListener('message', function (e) {
     if (e.data && e.data.type === 'profile_result' && e.data.reqId === 'editor') {
-        if (e.data.error) { alert(e.data.error); return; }
-        if (!e.data.skinUrl) { alert('No skin found'); return; }
+        if (e.data.error) { showNotice(e.data.error); return; }
+        if (!e.data.skinUrl) { showNotice('No skin found'); return; }
         var img = new Image();
         img.crossOrigin = 'Anonymous';
         img.onload = function () {
@@ -152,7 +162,7 @@ window.addEventListener('message', function (e) {
             updateTexture();
             buildModel(scene, e.data.modelType === 'slim');
         };
-        img.onerror = function () { alert('Failed to load skin'); };
+        img.onerror = function () { showNotice('Failed to load skin'); };
         img.src = e.data.skinUrl;
     }
 });

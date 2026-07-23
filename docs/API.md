@@ -26,12 +26,11 @@ Allows the extension to register a frontend UI tab.
     - `label` (String): The text displayed on the tab.
     - `url` (String): The path to your UI HTML file, relative to your extension's root directory (e.g., `"ui/index.html"`).
 
-### Dialogs (`dialogs:open`)
-*(Coming Soon)*
-- `Aether.ui.openDialog(options)`
+### Dialogs (`ui:dialogs`)
+The capability is present for compatibility, but `Aether.ui.openDialog()` is currently a stub and does not open a launcher dialog yet.
 
-### Instance Management (`instances:patch`)
-Allows the extension to programmatically query and modify instances.
+### Instance and Mod Management
+`instances:list` allows the extension to query instances. The separate `mods:list`, `mods:install`, `mods:delete`, and `mods:toggle` permissions control access to files in their `mods` directories. Sensitive mod operations require confirmation in the launcher UI.
 
 - `Aether.instances.list()`
   - Returns an array of objects representing all installed instances: `[{ id, name, version, loader }]`.
@@ -66,15 +65,15 @@ Allows the extension to write base64 encoded skins to the local filesystem.
   - **filename** (String): The name to save the skin as (e.g., `skin.png`). Returns the saved file path.
 
 ## Network Access
-By default, the backend Sandbox cannot access the network. To make HTTP requests, you must request `network:http` in your permissions and use the provided `Aether.http.get(url)` API.
-Direct browser `fetch()` is intentionally omitted from the backend sandbox to ensure all requests pass through Aether's domain whitelisting, logging, and rate-limiting systems.
+By default, the backend Sandbox cannot access the network. To make requests, you must request `network:http` in your permissions and use the provided `Aether.http.get(url)` API. Backend extension requests require HTTPS, an allowed hostname, and are limited to 10 MiB responses.
+Direct browser `fetch()` is unavailable in the backend sandbox. The provided HTTP API applies host allow-listing; logging and rate limiting are not currently implemented.
 
-*Note: Your frontend UI (running in the iframe) CAN use Aether's provided native `fetch()` because it operates under standard web security models, but this may be restricted in the future for security reasons.*
+*Note: An extension's frontend iframe can use the browser's normal `fetch()` behavior. That request is separate from the backend sandbox API and is not covered by the backend host allow-list.*
 
 ## File System Access
 By default, the backend Sandbox cannot download arbitrary files.
 - `Aether.fs.download(url, dest)` (requires `fs:download` permission)
-  - Downloads a file from the given URL (must be allowed in `hosts`) into the isolated instances/libraries folder.
+  - Downloads a file from the given URL (must be allowed in `hosts`) into Aether's shared `libraries` directory. This capability also requires HTTPS; mod installation additionally requires a `.jar` file of at most 100 MiB.
 
 ## Communication with the Frontend (Iframe)
 Your frontend UI runs in an `<iframe>` served by a local HTTP server. Because it's isolated, it cannot call the `Aether` Go API directly.
@@ -144,18 +143,26 @@ Future API versions will allow extensions to subscribe to core launcher events:
 - `Aether.events.on('instance:stop', (id) => { ... })`
 
 ## API Version Negotiation
-Extensions must declare the `api` version they target in their `manifest.json`. Aether will inject the appropriate capability shapes based on this version to ensure backwards compatibility. You can optionally define `minApi` and `maxApi` to restrict which versions of the launcher can load your extension.
+Extensions may declare an `api` version in their manifest. The current launcher does not negotiate API versions or enforce `minApi` and `maxApi` ranges; those fields are planned compatibility metadata.
 
 ## Extended Permissions Model
 
-Current permissions:
+Current permissions recognized by the runtime:
 - `ui:sidebar`
-- `ui:dialogs`
-- `instances:patch`
+- `ui:dialogs` (stub only)
+- `instances:list`
+- `mods:list`
+- `mods:install`
+- `mods:delete`
+- `mods:toggle`
 - `network:http`
 - `fs:download`
 - `launcher:modloader`
 - `skin:export`
+
+The legacy `instances:patch` permission is still recognized for migration and grants the current instance/mod capabilities. New extensions should use the granular permissions above.
+
+Confirmation requests and decisions are recorded in Aether's extension security log.
 
 Future granular permissions:
 - `instances:read`, `instances:write`
