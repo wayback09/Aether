@@ -2,7 +2,10 @@ package main
 
 import (
 	"embed"
+	"os"
+	"strings"
 
+	"Aether/pkg/extensions"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -12,6 +15,15 @@ import (
 var assets embed.FS
 
 func main() {
+	// If launched with a .aex file argument (e.g. by double-clicking in Explorer),
+	// install the extension and then continue to open the launcher normally.
+	if len(os.Args) > 1 {
+		arg := os.Args[1]
+		if strings.HasSuffix(strings.ToLower(arg), ".aex") {
+			_ = extensions.InstallFromArchive(arg)
+		}
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 
