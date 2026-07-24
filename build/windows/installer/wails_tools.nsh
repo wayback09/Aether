@@ -202,18 +202,13 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
 !macroend
 
 !macro wails.associateFiles
-    ; Register the .aex file extension with the Aether launcher
-    !insertmacro APP_ASSOCIATE "aex" \
-        "Aether.Extension" \
-        "Aether Extension Package" \
-        "$INSTDIR\aex-icon.ico,0" \
-        "Open with Aether" \
-        `"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"`
+    ; Create file associations
+    
 !macroend
 
 !macro wails.unassociateFiles
-    ; Remove the .aex file extension association
-    !insertmacro APP_UNASSOCIATE "aex" "Aether.Extension"
+    ; Delete app associations
+    
 !macroend
 
 !macro CUSTOM_PROTOCOL_ASSOCIATE PROTOCOL DESCRIPTION ICON COMMAND

@@ -155,7 +155,7 @@
         <button class="tab-btn {activeTab === 'gallery' ? 'active' : ''}" on:click={() => setTab('gallery')}>Gallery</button>
       </div>
       <button class="btn btn-secondary" on:click={handleLocalInstall} disabled={isInstalling}>
-        {isInstalling ? 'Installing...' : 'Install from .zip'}
+        {isInstalling ? 'Installing...' : 'Install from .aex'}
       </button>
     </div>
   </header>
@@ -165,7 +165,7 @@
       <EmptyState
         icon="puzzle"
         title="No extensions installed"
-        description="Install a .zip extension or visit the Gallery to add new capabilities to Aether."
+        description="Install a .aex extension or visit the Gallery to add new capabilities to Aether."
         actionLabel="Browse Gallery"
         on:action={() => setTab('gallery')}
       />

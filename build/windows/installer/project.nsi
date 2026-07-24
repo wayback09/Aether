@@ -88,17 +88,11 @@ Section
 
     !insertmacro wails.files
 
-    # Copy the app icon so it can be referenced as the .aex file icon
-    File "/oname=aex-icon.ico" "..\icon.ico"
-
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
-
-    # Notify the Windows Shell to refresh file icons immediately
-    System::Call 'Shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
     !insertmacro wails.writeUninstaller
 SectionEnd
