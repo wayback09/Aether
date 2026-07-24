@@ -35,6 +35,21 @@ All project documentation is located in the `docs/` directory. If you are lookin
 - **[UI Specifications](docs/UI.md)** - Layout rules, components, and empty states.
 - **[Styleguide](docs/STYLEGUIDE.md)** - Visual language, typography, colors, and animations.
 
+## Developer Tooling
+
+The following tools are available for building Aether extensions. They are currently **Work In Progress** and are not yet publicly released:
+
+- **Aether SDK** (`@aether/sdk`) — TypeScript type definitions and helper utilities for extension development.
+- **Aether CLI** (`aether`) — Scaffold, validate, and package extensions into `.aex` format.
+
+Both repos are currently private while they are being finalized.
+
 ## Getting Started
 
-*(Coming soon - Build instructions and release binaries will be available here.)*
+Download the latest release for your platform from the [Releases](../../releases) page.
+
+| Platform | File |
+|---|---|
+| Windows (x64) | `Aether-windows-amd64-installer.exe` |
+| macOS (Apple Silicon) | `Aether-macos-arm64.zip` |
+| Linux (x64) | `Aether-linux-amd64` |
